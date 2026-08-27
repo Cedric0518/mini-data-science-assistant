@@ -250,6 +250,11 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
     check_button = gr.Button("🔐 Check HF connection")
     check_result = gr.Textbox()
 
+    check_button.click(
+    fn=check_hf_token,
+    outputs=check_result
+    )
+
     ask_button.click(
         fn=ask_dataset,
         inputs=[file, question],
