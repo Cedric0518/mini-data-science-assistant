@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 from huggingface_hub import InferenceClient
 from transformers import pipeline
+import json
 
 client = InferenceClient(
     token=os.environ["HF_TOKEN"],
@@ -88,6 +89,96 @@ def get_columns(file):
 
     except Exception:
         return gr.update(choices=[], value=None)
+
+def calculate_average(file, column):
+    if file is None:
+        return "No dataset uploaded."
+
+    df = pd.read_csv(file)
+
+    if column not in df.columns:
+        return f"Column '{column}' not found."
+
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        return f"Column '{column}' is not numerical."
+
+    return float(df[column].mean())
+
+def calculate_median(file, column):
+    if file is None:
+        return "No dataset uploaded."
+
+    df = pd.read_csv(file)
+
+    if column not in df.columns:
+        return f"Column '{column}' not found."
+
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        return f"Column '{column}' is not numerical."
+
+    return float(df[column].median())
+
+
+def calculate_min(file, column):
+    if file is None:
+        return "No dataset uploaded."
+
+    df = pd.read_csv(file)
+
+    if column not in df.columns:
+        return f"Column '{column}' not found."
+
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        return f"Column '{column}' is not numerical."
+
+    return float(df[column].min())
+
+
+def calculate_max(file, column):
+    if file is None:
+        return "No dataset uploaded."
+
+    df = pd.read_csv(file)
+
+    if column not in df.columns:
+        return f"Column '{column}' not found."
+
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        return f"Column '{column}' is not numerical."
+
+    return float(df[column].max())
+
+
+def calculate_statistic(file, column, statistic):
+    if file is None:
+        return {"error": "No dataset uploaded."}
+
+    df = pd.read_csv(file)
+
+    if column not in df.columns:
+        return {"error": f"Column '{column}' not found."}
+
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        return {"error": f"Column '{column}' is not numerical."}
+
+    series = df[column].dropna()
+
+    if statistic == "mean":
+        value = series.mean()
+    elif statistic == "median":
+        value = series.median()
+    elif statistic == "min":
+        value = series.min()
+    elif statistic == "max":
+        value = series.max()
+    else:
+        return {"error": f"Unknown statistic: {statistic}"}
+
+    return {
+        "column": column,
+        "statistic": statistic,
+        "value": float(value)
+    }
         
 def ask_dataset(file, question):
     if file is None:
@@ -124,6 +215,30 @@ User question:
 Answer the question based only on the information provided.
 If the information is not sufficient, say so clearly.
 """
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate_statistic",
+            "description": "Calculate a statistical value for a numerical column in the uploaded dataset.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "column": {
+                        "type": "string",
+                        "description": "The name of the numerical column."
+                    },
+                    "statistic": {
+                        "type": "string",
+                        "enum": ["mean", "median", "min", "max"],
+                        "description": "The statistic to calculate."
+                    }
+                },
+                "required": ["column", "statistic"]
+            }
+        }
+    }
+]
 
         response = client.chat.completions.create(
             model="deepseek-ai/DeepSeek-V3-0324",
@@ -133,10 +248,79 @@ If the information is not sufficient, say so clearly.
                     "content": prompt
                 }
             ],
+            tools=tools,
             max_tokens=500,
         )
 
-        return response.choices[0].message.content
+message = response.choices[0].message
+
+if not message.tool_calls:
+    return message.content
+
+tool_call = message.tool_calls[0]
+
+tool_name = tool_call.function.name
+tool_arguments = json.loads(tool_call.function.arguments)
+
+if tool_name == "calculate_statistic":
+    tool_result = calculate_statistic(
+        file=file,
+        column=tool_arguments["column"],
+        statistic=tool_arguments["statistic"]
+    )
+else:
+    tool_result = {"error": f"Unknown tool: {tool_name}"}
+
+
+
+messages = [
+    {
+        "role": "user",
+        "content": prompt
+    },
+    message
+]
+
+messages.append(
+    {
+        "role": "tool",
+        "tool_call_id": tool_call.id,
+        "content": json.dumps(tool_result)
+    }
+)
+
+final_response = client.chat.completions.create(
+    model="deepseek-ai/DeepSeek-V3-0324",
+    messages=messages,
+    max_tokens=500,
+)
+
+return final_response.choices[0].message.content
+
+
+messages = [
+    {
+        "role": "user",
+        "content": prompt
+    },
+    message
+]
+
+messages.append(
+    {
+        "role": "tool",
+        "tool_call_id": tool_call.id,
+        "content": json.dumps(tool_result)
+    }
+)
+
+final_response = client.chat.completions.create(
+    model="deepseek-ai/DeepSeek-V3-0324",
+    messages=messages,
+    max_tokens=500,
+)
+
+return final_response.choices[0].message.content
 
     except Exception as e:
         return f"❌ Error: {str(e)}"
