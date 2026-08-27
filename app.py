@@ -9,7 +9,14 @@ client = InferenceClient(
     token=os.environ["HF_TOKEN"],
     provider="auto"
 )
+def check_hf_token():
+    token = os.environ.get("HF_TOKEN")
 
+    if not token:
+        return "❌ HF_TOKEN not found"
+
+    return f"✅ HF_TOKEN found | starts with hf_: {token.startswith('hf_')} | length: {len(token)}"
+    
 def analyze_dataset(file):
     if file is None:
         return "Please upload a CSV file.", None, None
@@ -240,6 +247,9 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
     
     answer = gr.Markdown()
     
+    check_button = gr.Button("🔐 Check HF connection")
+    check_result = gr.Textbox()
+
     ask_button.click(
         fn=ask_dataset,
         inputs=[file, question],
