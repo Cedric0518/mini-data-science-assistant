@@ -15,7 +15,11 @@ def check_hf_token():
     if not token:
         return "❌ HF_TOKEN not found"
 
-    return f"✅ HF_TOKEN found | starts with hf_: {token.startswith('hf_')} | length: {len(token)}"
+    return (
+        f"✅ HF_TOKEN found\n"
+        f"Starts with hf_: {token.startswith('hf_')}\n"
+        f"Length: {len(token)}"
+    )
     
 def analyze_dataset(file):
     if file is None:
