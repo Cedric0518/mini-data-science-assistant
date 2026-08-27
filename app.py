@@ -407,6 +407,5 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         outputs=answer
     )    
 
-
 if __name__ == "__main__":
     demo.launch()
