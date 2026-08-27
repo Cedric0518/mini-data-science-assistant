@@ -4,3 +4,4 @@ matplotlib
 huggingface_hub
 transformers
 torch
+mcp
