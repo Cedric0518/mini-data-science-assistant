@@ -6,7 +6,8 @@ from huggingface_hub import InferenceClient
 from transformers import pipeline
 
 client = InferenceClient(
-    token=os.environ["HF_TOKEN"]
+    token=os.environ["HF_TOKEN"],
+    provider="auto"
 )
 
 def analyze_dataset(file):
@@ -123,7 +124,7 @@ Answer the question based only on the information provided.
 If the information is not sufficient, say so clearly.
 """
 
-        response = client.chat_completion(
+        response = client.chat.completions.create(
             model="Qwen/Qwen2.5-7B-Instruct",
             messages=[
                 {
