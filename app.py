@@ -190,9 +190,7 @@ def ask_dataset(file, question):
     try:
         df = pd.read_csv(file)
 
-        # Create a compact summary instead of sending the whole dataset
         summary = df.describe(include="all").to_string()
-
         columns = df.dtypes.to_string()
 
         prompt = f"""
@@ -215,30 +213,31 @@ User question:
 Answer the question based only on the information provided.
 If the information is not sufficient, say so clearly.
 """
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "calculate_statistic",
-            "description": "Calculate a statistical value for a numerical column in the uploaded dataset.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "column": {
-                        "type": "string",
-                        "description": "The name of the numerical column."
-                    },
-                    "statistic": {
-                        "type": "string",
-                        "enum": ["mean", "median", "min", "max"],
-                        "description": "The statistic to calculate."
+
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "calculate_statistic",
+                    "description": "Calculate a statistical value for a numerical column in the uploaded dataset.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "column": {
+                                "type": "string",
+                                "description": "The name of the numerical column."
+                            },
+                            "statistic": {
+                                "type": "string",
+                                "enum": ["mean", "median", "min", "max"],
+                                "description": "The statistic to calculate."
+                            }
+                        },
+                        "required": ["column", "statistic"]
                     }
-                },
-                "required": ["column", "statistic"]
+                }
             }
-        }
-    }
-]
+        ]
 
         response = client.chat.completions.create(
             model="deepseek-ai/DeepSeek-V3-0324",
@@ -252,75 +251,50 @@ tools = [
             max_tokens=500,
         )
 
-message = response.choices[0].message
+        message = response.choices[0].message
 
-if not message.tool_calls:
-    return message.content
+        if not message.tool_calls:
+            return message.content
 
-tool_call = message.tool_calls[0]
+        tool_call = message.tool_calls[0]
 
-tool_name = tool_call.function.name
-tool_arguments = json.loads(tool_call.function.arguments)
+        tool_name = tool_call.function.name
+        tool_arguments = json.loads(tool_call.function.arguments)
 
-if tool_name == "calculate_statistic":
-    tool_result = calculate_statistic(
-        file=file,
-        column=tool_arguments["column"],
-        statistic=tool_arguments["statistic"]
-    )
-else:
-    tool_result = {"error": f"Unknown tool: {tool_name}"}
+        if tool_name == "calculate_statistic":
+            tool_result = calculate_statistic(
+                file=file,
+                column=tool_arguments["column"],
+                statistic=tool_arguments["statistic"]
+            )
+        else:
+            tool_result = {
+                "error": f"Unknown tool: {tool_name}"
+            }
 
+        messages = [
+            {
+                "role": "user",
+                "content": prompt
+            },
+            message
+        ]
 
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": json.dumps(tool_result)
+            }
+        )
 
-messages = [
-    {
-        "role": "user",
-        "content": prompt
-    },
-    message
-]
+        final_response = client.chat.completions.create(
+            model="deepseek-ai/DeepSeek-V3-0324",
+            messages=messages,
+            max_tokens=500,
+        )
 
-messages.append(
-    {
-        "role": "tool",
-        "tool_call_id": tool_call.id,
-        "content": json.dumps(tool_result)
-    }
-)
-
-final_response = client.chat.completions.create(
-    model="deepseek-ai/DeepSeek-V3-0324",
-    messages=messages,
-    max_tokens=500,
-)
-
-return final_response.choices[0].message.content
-
-
-messages = [
-    {
-        "role": "user",
-        "content": prompt
-    },
-    message
-]
-
-messages.append(
-    {
-        "role": "tool",
-        "tool_call_id": tool_call.id,
-        "content": json.dumps(tool_result)
-    }
-)
-
-final_response = client.chat.completions.create(
-    model="deepseek-ai/DeepSeek-V3-0324",
-    messages=messages,
-    max_tokens=500,
-)
-
-return final_response.choices[0].message.content
+        return final_response.choices[0].message.content
 
     except Exception as e:
         return f"❌ Error: {str(e)}"
