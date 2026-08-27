@@ -2,6 +2,7 @@ import gradio as gr
 import pandas as pd
 import matplotlib.pyplot as plt
 from huggingface_hub import InferenceClient
+from transformers import pipeline
 
 client = InferenceClient(
     token=None
@@ -137,6 +138,20 @@ If the information is not sufficient, say so clearly.
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
+transcriber = pipeline(
+    "automatic-speech-recognition",
+    model="openai/whisper-small"
+)
+
+
+def transcribe_audio(audio):
+    if audio is None:
+        return ""
+
+    result = transcriber(audio)
+    return result["text"]
+
+    
 with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
     gr.Markdown(
@@ -198,10 +213,22 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
     )
     
     gr.Markdown("## 🤖 Ask Your Dataset")
+    
+    voice_input = gr.Audio(
+        sources=["microphone"],
+        type="filepath",
+        label="🎤 Ask by voice"
+    )
 
     question = gr.Textbox(
         label="Ask a question",
         placeholder="What can you tell me about this dataset?"
+    )
+
+    voice_input.change(
+        fn=transcribe_audio,
+        inputs=voice_input,
+        outputs=question
     )
     
     ask_button = gr.Button(
