@@ -197,7 +197,7 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         outputs=plot
     )
     
-gr.Markdown("## 🤖 Ask Your Dataset")
+    gr.Markdown("## 🤖 Ask Your Dataset")
 
     question = gr.Textbox(
         label="Ask a question",
