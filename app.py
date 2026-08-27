@@ -1,7 +1,11 @@
 import gradio as gr
 import pandas as pd
 import matplotlib.pyplot as plt
+from huggingface_hub import InferenceClient
 
+client = InferenceClient(
+    token=None
+)
 
 def analyze_dataset(file):
     if file is None:
@@ -80,7 +84,58 @@ def get_columns(file):
 
     except Exception:
         return gr.update(choices=[], value=None)
+        
+def ask_dataset(file, question):
+    if file is None:
+        return "⚠️ Please upload a CSV file."
 
+    if not question.strip():
+        return "⚠️ Please enter a question."
+
+    try:
+        df = pd.read_csv(file)
+
+        # Create a compact summary instead of sending the whole dataset
+        summary = df.describe(include="all").to_string()
+
+        columns = df.dtypes.to_string()
+
+        prompt = f"""
+You are a Data Science Assistant.
+
+Here is information about a dataset:
+
+Shape:
+{df.shape}
+
+Columns and data types:
+{columns}
+
+Statistical summary:
+{summary}
+
+User question:
+{question}
+
+Answer the question based only on the information provided.
+If the information is not sufficient, say so clearly.
+"""
+
+        response = client.chat_completion(
+            model="Qwen/Qwen2.5-7B-Instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=500,
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
 
 with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
@@ -141,6 +196,26 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         inputs=[file, column_dropdown],
         outputs=plot
     )
+    
+gr.Markdown("## 🤖 Ask Your Dataset")
+
+    question = gr.Textbox(
+        label="Ask a question",
+        placeholder="What can you tell me about this dataset?"
+    )
+    
+    ask_button = gr.Button(
+        "🤖 Ask",
+        variant="primary"
+    )
+    
+    answer = gr.Markdown()
+    
+    ask_button.click(
+        fn=ask_dataset,
+        inputs=[file, question],
+        outputs=answer
+    )    
 
 
 if __name__ == "__main__":
