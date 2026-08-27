@@ -1,0 +1,146 @@
+import gradio as gr
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def analyze_dataset(file):
+    if file is None:
+        return "Please upload a CSV file.", None, None
+
+    try:
+        df = pd.read_csv(file.name)
+
+        # Dataset overview
+        rows, columns = df.shape
+        missing = int(df.isna().sum().sum())
+        duplicates = int(df.duplicated().sum())
+
+        overview = f"""
+### 📋 Dataset Overview
+
+- **Rows:** {rows:,}
+- **Columns:** {columns:,}
+- **Missing values:** {missing:,}
+- **Duplicate rows:** {duplicates:,}
+"""
+
+        # Statistics
+        numeric_df = df.select_dtypes(include="number")
+
+        if not numeric_df.empty:
+            statistics = numeric_df.describe().round(2)
+        else:
+            statistics = pd.DataFrame(
+                {"Message": ["No numerical columns found."]}
+            )
+
+        return overview, statistics, df.head(10)
+
+    except Exception as e:
+        return f"❌ Error: {str(e)}", None, None
+
+
+def create_histogram(file, column):
+    if file is None:
+        return None
+
+    try:
+        df = pd.read_csv(file.name)
+
+        if column not in df.columns:
+            return None
+
+        if not pd.api.types.is_numeric_dtype(df[column]):
+            return None
+
+        fig, ax = plt.subplots()
+        ax.hist(df[column].dropna(), bins=30)
+        ax.set_title(f"Distribution of {column}")
+        ax.set_xlabel(column)
+        ax.set_ylabel("Frequency")
+
+        return fig
+
+    except Exception:
+        return None
+
+
+def get_columns(file):
+    if file is None:
+        return gr.update(choices=[], value=None)
+
+    try:
+        df = pd.read_csv(file.name)
+        numeric_columns = df.select_dtypes(include="number").columns.tolist()
+
+        return gr.update(
+            choices=numeric_columns,
+            value=numeric_columns[0] if numeric_columns else None
+        )
+
+    except Exception:
+        return gr.update(choices=[], value=None)
+
+
+with gr.Blocks(title="Mini Data Science Assistant") as demo:
+
+    gr.Markdown(
+        """
+        # 📊 Mini Data Science Assistant
+
+        Upload a CSV file and quickly explore your dataset.
+        """
+    )
+
+    file = gr.File(
+        label="Upload your CSV",
+        file_types=[".csv"]
+    )
+
+    analyze_button = gr.Button(
+        "🔎 Analyze Dataset",
+        variant="primary"
+    )
+
+    overview = gr.Markdown()
+
+    statistics = gr.Dataframe(
+        label="📈 Numerical Statistics"
+    )
+
+    preview = gr.Dataframe(
+        label="👀 Dataset Preview"
+    )
+
+    gr.Markdown("## 📊 Visualization")
+
+    column_dropdown = gr.Dropdown(
+        label="Select a numerical column",
+        choices=[]
+    )
+
+    generate_button = gr.Button("Generate Histogram")
+
+    plot = gr.Plot()
+
+    file.change(
+        fn=get_columns,
+        inputs=file,
+        outputs=column_dropdown
+    )
+
+    analyze_button.click(
+        fn=analyze_dataset,
+        inputs=file,
+        outputs=[overview, statistics, preview]
+    )
+
+    generate_button.click(
+        fn=create_histogram,
+        inputs=[file, column_dropdown],
+        outputs=plot
+    )
+
+
+if __name__ == "__main__":
+    demo.launch()
