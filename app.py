@@ -7,7 +7,7 @@ from transformers import pipeline
 
 client = InferenceClient(
     token=os.environ["HF_TOKEN"],
-    provider="hf-inference"
+    provider="auto"
 )
 
 def analyze_dataset(file):
@@ -125,7 +125,7 @@ If the information is not sufficient, say so clearly.
 """
 
         response = client.chat.completions.create(
-            model="Qwen/Qwen2.5-7B-Instruct",
+            model="deepseek-ai/DeepSeek-V3-0324",
             messages=[
                 {
                     "role": "user",
