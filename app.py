@@ -190,7 +190,7 @@ def ask_dataset(file, question):
     try:
         df = pd.read_csv(file)
 
-        summary = df.describe(include="all").to_string()
+        summary = df.describe().round(2).to_string()
         columns = df.dtypes.to_string()
 
         prompt = f"""
@@ -248,7 +248,7 @@ If the information is not sufficient, say so clearly.
                 }
             ],
             tools=tools,
-            max_tokens=500,
+            max_tokens=300,
         )
 
         message = response.choices[0].message
@@ -291,7 +291,7 @@ If the information is not sufficient, say so clearly.
         final_response = client.chat.completions.create(
             model="deepseek-ai/DeepSeek-V3-0324",
             messages=messages,
-            max_tokens=500,
+            max_tokens=300,
         )
 
         return final_response.choices[0].message.content
