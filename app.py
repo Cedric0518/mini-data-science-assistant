@@ -1,5 +1,6 @@
 import gradio as gr
 import pandas as pd
+import os 
 import matplotlib.pyplot as plt
 from huggingface_hub import InferenceClient
 from transformers import pipeline
