@@ -8,7 +8,7 @@ def analyze_dataset(file):
         return "Please upload a CSV file.", None, None
 
     try:
-        df = pd.read_csv(file.name)
+        df = pd.read_csv(file)
 
         # Dataset overview
         rows, columns = df.shape
@@ -45,7 +45,7 @@ def create_histogram(file, column):
         return None
 
     try:
-        df = pd.read_csv(file.name)
+        df = pd.read_csv(file)
 
         if column not in df.columns:
             return None
@@ -70,7 +70,7 @@ def get_columns(file):
         return gr.update(choices=[], value=None)
 
     try:
-        df = pd.read_csv(file.name)
+        df = pd.read_csv(file)
         numeric_columns = df.select_dtypes(include="number").columns.tolist()
 
         return gr.update(
