@@ -5,7 +5,7 @@ from huggingface_hub import InferenceClient
 from transformers import pipeline
 
 client = InferenceClient(
-    token=None
+    token=os.environ["HF_TOKEN"]
 )
 
 def analyze_dataset(file):
