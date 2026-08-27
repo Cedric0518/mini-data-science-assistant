@@ -94,7 +94,7 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
     file = gr.File(
         label="Upload your CSV",
-        file_types=[".csv"]
+        file_types=[".csv"],
         type="filepath"
     )
 
