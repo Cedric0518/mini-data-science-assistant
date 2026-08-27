@@ -1,3 +1,4 @@
 gradio
 pandas
 matplotlib
+huggingface_hub
