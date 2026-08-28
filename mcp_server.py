@@ -49,5 +49,30 @@ def calculate_statistic(
         return f"Error: {str(e)}"
 
 
+@mcp.tool()
+def get_dataset_info(file_path: str) -> str:
+    """
+    Return basic information about a CSV dataset.
+
+    Args:
+        file_path: Path to the CSV file.
+    """
+
+    import pandas as pd
+
+    try:
+        df = pd.read_csv(file_path)
+
+        return f"""
+Rows: {df.shape[0]}
+Columns: {df.shape[1]}
+Column names: {list(df.columns)}
+Missing values: {int(df.isna().sum().sum())}
+Duplicate rows: {int(df.duplicated().sum())}
+"""
+
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 if __name__ == "__main__":
     mcp.run()

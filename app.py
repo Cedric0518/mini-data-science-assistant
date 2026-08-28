@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 from huggingface_hub import InferenceClient
 from transformers import pipeline
 import json
+import asyncio
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
 
 client = InferenceClient(
     token=os.environ["HF_TOKEN"],
@@ -90,95 +94,25 @@ def get_columns(file):
     except Exception:
         return gr.update(choices=[], value=None)
 
-def calculate_average(file, column):
-    if file is None:
-        return "No dataset uploaded."
-
-    df = pd.read_csv(file)
-
-    if column not in df.columns:
-        return f"Column '{column}' not found."
-
-    if not pd.api.types.is_numeric_dtype(df[column]):
-        return f"Column '{column}' is not numerical."
-
-    return float(df[column].mean())
-
-def calculate_median(file, column):
-    if file is None:
-        return "No dataset uploaded."
-
-    df = pd.read_csv(file)
-
-    if column not in df.columns:
-        return f"Column '{column}' not found."
-
-    if not pd.api.types.is_numeric_dtype(df[column]):
-        return f"Column '{column}' is not numerical."
-
-    return float(df[column].median())
 
 
-def calculate_min(file, column):
-    if file is None:
-        return "No dataset uploaded."
+async def call_mcp_tool(tool_name, arguments):
+    server_params = StdioServerParameters(
+        command="python",
+        args=["mcp_server.py"],
+        env=os.environ.copy()
+    )
 
-    df = pd.read_csv(file)
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
 
-    if column not in df.columns:
-        return f"Column '{column}' not found."
+            result = await session.call_tool(
+                tool_name,
+                arguments
+            )
 
-    if not pd.api.types.is_numeric_dtype(df[column]):
-        return f"Column '{column}' is not numerical."
-
-    return float(df[column].min())
-
-
-def calculate_max(file, column):
-    if file is None:
-        return "No dataset uploaded."
-
-    df = pd.read_csv(file)
-
-    if column not in df.columns:
-        return f"Column '{column}' not found."
-
-    if not pd.api.types.is_numeric_dtype(df[column]):
-        return f"Column '{column}' is not numerical."
-
-    return float(df[column].max())
-
-
-def calculate_statistic(file, column, statistic):
-    if file is None:
-        return {"error": "No dataset uploaded."}
-
-    df = pd.read_csv(file)
-
-    if column not in df.columns:
-        return {"error": f"Column '{column}' not found."}
-
-    if not pd.api.types.is_numeric_dtype(df[column]):
-        return {"error": f"Column '{column}' is not numerical."}
-
-    series = df[column].dropna()
-
-    if statistic == "mean":
-        value = series.mean()
-    elif statistic == "median":
-        value = series.median()
-    elif statistic == "min":
-        value = series.min()
-    elif statistic == "max":
-        value = series.max()
-    else:
-        return {"error": f"Unknown statistic: {statistic}"}
-
-    return {
-        "column": column,
-        "statistic": statistic,
-        "value": float(value)
-    }
+            return result
         
 def ask_dataset(file, question):
     if file is None:
@@ -188,6 +122,7 @@ def ask_dataset(file, question):
         return "⚠️ Please enter a question."
 
     try:
+        # Get basic dataset information for the LLM
         df = pd.read_csv(file)
 
         summary = df.describe().round(2).to_string()
@@ -207,11 +142,13 @@ Columns and data types:
 Statistical summary:
 {summary}
 
+Dataset file path:
+{file}
+
 User question:
 {question}
 
-Answer the question based only on the information provided.
-If the information is not sufficient, say so clearly.
+Use the available tools when necessary to answer the question.
 """
 
         tools = [
@@ -223,17 +160,42 @@ If the information is not sufficient, say so clearly.
                     "parameters": {
                         "type": "object",
                         "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Path to the CSV dataset."
+                            },
                             "column": {
                                 "type": "string",
-                                "description": "The name of the numerical column."
+                                "description": "Name of the numerical column."
                             },
                             "statistic": {
                                 "type": "string",
                                 "enum": ["mean", "median", "min", "max"],
-                                "description": "The statistic to calculate."
+                                "description": "Statistic to calculate."
                             }
                         },
-                        "required": ["column", "statistic"]
+                        "required": [
+                            "file_path",
+                            "column",
+                            "statistic"
+                        ]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_dataset_info",
+                    "description": "Get basic information about the CSV dataset.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Path to the CSV dataset."
+                            }
+                        },
+                        "required": ["file_path"]
                     }
                 }
             }
@@ -253,24 +215,36 @@ If the information is not sufficient, say so clearly.
 
         message = response.choices[0].message
 
+        # No tool required
         if not message.tool_calls:
             return message.content
 
         tool_call = message.tool_calls[0]
 
         tool_name = tool_call.function.name
-        tool_arguments = json.loads(tool_call.function.arguments)
+        tool_arguments = json.loads(
+            tool_call.function.arguments
+        )
 
-        if tool_name == "calculate_statistic":
-            tool_result = calculate_statistic(
-                file=file,
-                column=tool_arguments["column"],
-                statistic=tool_arguments["statistic"]
+        # Make sure the actual uploaded file is used
+        tool_arguments["file_path"] = file
+
+        # Call the REAL MCP server
+        mcp_result = asyncio.run(
+            call_mcp_tool(
+                tool_name,
+                tool_arguments
             )
-        else:
-            tool_result = {
-                "error": f"Unknown tool: {tool_name}"
-            }
+        )
+
+        # Extract MCP result
+        tool_content = []
+
+        for content in mcp_result.content:
+            if hasattr(content, "text"):
+                tool_content.append(content.text)
+
+        tool_result = "\n".join(tool_content)
 
         messages = [
             {
@@ -284,7 +258,7 @@ If the information is not sufficient, say so clearly.
             {
                 "role": "tool",
                 "tool_call_id": tool_call.id,
-                "content": json.dumps(tool_result)
+                "content": tool_result
             }
         )
 
