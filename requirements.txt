@@ -4,4 +4,4 @@ matplotlib
 huggingface_hub
 transformers
 torch
-mcp
+mcp==1.29.1
