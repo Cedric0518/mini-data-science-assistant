@@ -1,17 +1,9 @@
 import asyncio
-import os
 import json
 
-from huggingface_hub import InferenceClient
+import ollama
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-
-
-HF_TOKEN = os.environ["HF_TOKEN"]
-
-llm = InferenceClient(
-    token=HF_TOKEN
-)
 
 
 async def main():
@@ -30,7 +22,7 @@ async def main():
             # Get MCP tools
             tools_result = await session.list_tools()
 
-            # Convert MCP tool → LLM tool format
+            # Convert MCP tools → Ollama tool format
             tools = []
 
             for tool in tools_result.tools:
@@ -48,50 +40,51 @@ async def main():
                 print("-", tool["function"]["name"])
 
             # User question
-            question = """
-How many rows and columns does the dataset have?
-
-The available dataset file is:
-./uber_stock_data.csv
-"""
-
             messages = [
                 {
                     "role": "system",
                     "content": """
 You are a Data Science Assistant.
 
-Use the available tools whenever they are necessary
-to answer questions about the dataset.
+Use the available tools to answer the user's question.
+
+If the user asks you to filter, search, or select rows from the dataset,
+use the filter_data tool.
+
+Do not invent tool names.
+Only call tools that are provided to you.
 """
                 },
                 {
                     "role": "user",
-                    "content": question
+                    "content": """
+Show me all rows where the Open price is greater than 50.
+
+The available dataset file is:
+./uber_stock_data.csv
+"""
                 }
             ]
 
-            # Ask LLM
-            response = llm.chat.completions.create(
-                model="deepseek-ai/DeepSeek-V3-0324",
+            # Ask Gemma
+            response = ollama.chat(
+                model="gemma4:e4b",
                 messages=messages,
                 tools=tools,
-                tool_choice="auto",
-                max_tokens=500,
             )
 
-            message = response.choices[0].message
+            message = response["message"]
 
             print("\n🤖 LLM RESPONSE:")
             print(message)
 
             # Check if LLM wants to call a tool
-            if message.tool_calls:
+            if message.get("tool_calls"):
 
-                tool_call = message.tool_calls[0]
+                tool_call = message["tool_calls"][0]
 
-                tool_name = tool_call.function.name
-                arguments = json.loads(tool_call.function.arguments)
+                tool_name = tool_call["function"]["name"]
+                arguments = tool_call["function"]["arguments"]
 
                 print("\n🛠️ TOOL SELECTED:")
                 print(tool_name)
@@ -110,30 +103,29 @@ to answer questions about the dataset.
                 print("\n📊 MCP RESULT:")
                 print(tool_result)
 
-                # Send result back to LLM
+                # Send result back to Gemma
                 messages.append(message)
 
                 messages.append({
                     "role": "tool",
-                    "tool_call_id": tool_call.id,
+                    "tool_name": tool_name,
                     "content": tool_result,
                 })
 
-                final_response = llm.chat.completions.create(
-                    model="deepseek-ai/DeepSeek-V3-0324",
+                final_response = ollama.chat(
+                    model="gemma4:e4b",
                     messages=messages,
-                    max_tokens=500,
                 )
 
                 print("\n💬 FINAL ANSWER:")
                 print(
-                    final_response.choices[0].message.content
+                    final_response["message"]["content"]
                 )
 
             else:
 
                 print("\n💬 LLM DID NOT CALL A TOOL")
-                print(message.content)
+                print(message.get("content"))
 
 
 if __name__ == "__main__":
