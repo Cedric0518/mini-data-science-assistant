@@ -1,7 +1,7 @@
 gradio
 pandas
 matplotlib
-huggingface_hub
+ollama
 transformers
 torch
 mcp==1.29.1

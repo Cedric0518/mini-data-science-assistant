@@ -2,18 +2,12 @@ import gradio as gr
 import pandas as pd
 import os 
 import matplotlib.pyplot as plt
-from huggingface_hub import InferenceClient
+import ollama
 from transformers import pipeline
 import json
 import asyncio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-
-
-client = InferenceClient(
-    token=os.environ["HF_TOKEN"],
-    provider="auto"
-)
 
     
 def analyze_dataset(file):
@@ -113,165 +107,280 @@ async def call_mcp_tool(tool_name, arguments):
             )
 
             return result
-        
+
 def ask_dataset(file, question):
+
     if file is None:
-        return "⚠️ Please upload a CSV file."
+        return "⚠️ Please upload a CSV file.", None
 
     if not question.strip():
-        return "⚠️ Please enter a question."
+        return "⚠️ Please enter a question.", None
 
     try:
-        # Get basic dataset information for the LLM
+
+        # --------------------------------------------------
+        # 1. Read dataset
+        # --------------------------------------------------
+
         df = pd.read_csv(file)
 
-        summary = df.describe().round(2).to_string()
-        columns = df.dtypes.to_string()
+        columns = df.columns.tolist()
 
-        prompt = f"""
-You are a Data Science Assistant.
-
-Here is information about a dataset:
-
-Shape:
-{df.shape}
-
-Columns and data types:
-{columns}
-
-Statistical summary:
-{summary}
-
-Dataset file path:
-{file}
-
-User question:
-{question}
-
-Use the available tools when necessary to answer the question.
-"""
-
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "calculate_statistic",
-                    "description": "Calculate a statistical value for a numerical column in the uploaded dataset.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "file_path": {
-                                "type": "string",
-                                "description": "Path to the CSV dataset."
-                            },
-                            "column": {
-                                "type": "string",
-                                "description": "Name of the numerical column."
-                            },
-                            "statistic": {
-                                "type": "string",
-                                "enum": ["mean", "median", "min", "max"],
-                                "description": "Statistic to calculate."
-                            }
-                        },
-                        "required": [
-                            "file_path",
-                            "column",
-                            "statistic"
-                        ]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_dataset_info",
-                    "description": "Get basic information about the CSV dataset.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "file_path": {
-                                "type": "string",
-                                "description": "Path to the CSV dataset."
-                            }
-                        },
-                        "required": ["file_path"]
-                    }
-                }
-            }
-        ]
-
-        response = client.chat.completions.create(
-            model="deepseek-ai/DeepSeek-V3-0324",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            tools=tools,
-            max_tokens=300,
+        numeric_columns = (
+            df.select_dtypes(include="number")
+            .columns
+            .tolist()
         )
 
-        message = response.choices[0].message
+        # --------------------------------------------------
+        # 2. Get MCP tools
+        # --------------------------------------------------
 
-        # No tool required
-        if not message.tool_calls:
-            return message.content
+        async def get_mcp_tools():
 
-        tool_call = message.tool_calls[0]
-
-        tool_name = tool_call.function.name
-        tool_arguments = json.loads(
-            tool_call.function.arguments
-        )
-
-        # Make sure the actual uploaded file is used
-        tool_arguments["file_path"] = file
-
-        # Call the REAL MCP server
-        mcp_result = asyncio.run(
-            call_mcp_tool(
-                tool_name,
-                tool_arguments
+            server_params = StdioServerParameters(
+                command="python",
+                args=["mcp_server.py"],
+                env=os.environ.copy()
             )
-        )
 
-        # Extract MCP result
-        tool_content = []
+            async with stdio_client(server_params) as (read, write):
 
-        for content in mcp_result.content:
-            if hasattr(content, "text"):
-                tool_content.append(content.text)
+                async with ClientSession(read, write) as session:
 
-        tool_result = "\n".join(tool_content)
+                    await session.initialize()
+
+                    tools_result = await session.list_tools()
+
+                    tools = []
+
+                    for tool in tools_result.tools:
+
+                        tools.append({
+                            "type": "function",
+                            "function": {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "parameters": tool.inputSchema,
+                            }
+                        })
+
+                    return tools
+
+        tools = asyncio.run(get_mcp_tools())
+
+        # --------------------------------------------------
+        # 3. Ask Gemma which MCP tool to use
+        # --------------------------------------------------
 
         messages = [
             {
-                "role": "user",
-                "content": prompt
+                "role": "system",
+                "content": """
+You are a Data Science Assistant.
+
+Use the MCP tools to answer questions about the uploaded CSV dataset.
+
+Rules:
+
+- Use an MCP tool when the question requires data from the dataset.
+- For average, mean, median, minimum, or maximum use calculate_statistic.
+- For filtering rows use filter_data.
+- For dataset information use get_dataset_info.
+- Always use an exact column name from the available columns.
+- "average" means statistic = "mean".
+- If the user asks for average price, identify the most appropriate price-related numerical column.
+- Do not invent column names.
+"""
             },
-            message
+            {
+                "role": "user",
+                "content": f"""
+Available columns:
+
+{columns}
+
+Numerical columns:
+
+{numeric_columns}
+
+User question:
+
+{question}
+"""
+            }
         ]
 
-        messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": tool_result
-            }
-        )
-
-        final_response = client.chat.completions.create(
-            model="deepseek-ai/DeepSeek-V3-0324",
+        response = ollama.chat(
+            model="gemma4:e4b",
             messages=messages,
-            max_tokens=300,
+            tools=tools,
         )
 
-        return final_response.choices[0].message.content
+        message = response["message"]
+
+        # --------------------------------------------------
+        # 4. Check tool selection
+        # --------------------------------------------------
+
+        if not message.get("tool_calls"):
+
+            return (
+                message.get(
+                    "content",
+                    "⚠️ The model did not select a data analysis tool."
+                ),
+                None
+            )
+
+        # --------------------------------------------------
+        # 5. Get selected tool
+        # --------------------------------------------------
+
+        tool_call = message["tool_calls"][0]
+
+        tool_name = tool_call["function"]["name"]
+
+        tool_arguments = tool_call["function"]["arguments"]
+
+        print("====================================")
+        print("QUESTION:", question)
+        print("TOOL SELECTED:", tool_name)
+        print("TOOL ARGUMENTS:", tool_arguments)
+        print("====================================")
+
+        # Always use the actual uploaded file
+        tool_arguments["file_path"] = file
+
+        # --------------------------------------------------
+        # 6. Execute MCP tool
+        # --------------------------------------------------
+
+        async def execute_mcp_tool():
+
+            server_params = StdioServerParameters(
+                command="python",
+                args=["mcp_server.py"],
+                env=os.environ.copy()
+            )
+
+            async with stdio_client(server_params) as (read, write):
+
+                async with ClientSession(read, write) as session:
+
+                    await session.initialize()
+
+                    result = await session.call_tool(
+                        tool_name,
+                        arguments=tool_arguments
+                    )
+
+                    return result.content[0].text
+
+        tool_result = asyncio.run(
+            execute_mcp_tool()
+        )
+
+        print("MCP RESULT:", tool_result)
+
+        # --------------------------------------------------
+        # 7. Convert MCP result
+        # --------------------------------------------------
+
+        if tool_name == "calculate_statistic":
+
+            try:
+                numeric_result = float(tool_result)
+
+                structured_result = {
+                    "success": True,
+                    "result": numeric_result
+                }
+
+            except ValueError:
+
+                structured_result = {
+                    "success": False,
+                    "error": tool_result
+                }
+
+        else:
+
+            try:
+
+                structured_result = json.loads(tool_result)
+
+            except json.JSONDecodeError:
+
+                structured_result = {
+                    "success": False,
+                    "error": tool_result
+                }
+
+        # --------------------------------------------------
+        # 8. Prepare final answer
+        # --------------------------------------------------
+
+        if structured_result.get("success"):
+
+            if "rows" in structured_result:
+
+                total_rows = structured_result.get(
+                    "total_rows",
+                    0
+                )
+
+                answer = (
+                    f"**{total_rows:,} rows match your query.**"
+                )
+
+            elif "result" in structured_result:
+
+                result = structured_result["result"]
+
+                answer = (
+                    f"**The result is {result:.2f}.**"
+                )
+
+            else:
+
+                answer = (
+                    "The analysis was completed successfully."
+                )
+
+        else:
+
+            answer = (
+                f"❌ {structured_result.get('error', 'Unknown error')}"
+            )
+
+        # --------------------------------------------------
+        # 9. Prepare table
+        # --------------------------------------------------
+
+        table_data = None
+
+        if (
+            structured_result.get("success")
+            and "rows" in structured_result
+        ):
+
+            table_data = pd.DataFrame(
+                structured_result["rows"]
+            )
+
+        # --------------------------------------------------
+        # 10. Return
+        # --------------------------------------------------
+
+        return answer, table_data
 
     except Exception as e:
-        return f"❌ Error: {str(e)}"
+
+        print("ERROR:", str(e))
+
+        return f"❌ Error: {str(e)}", None
+
 
 transcriber = pipeline(
     "automatic-speech-recognition",
@@ -372,14 +481,18 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
     )
     
     answer = gr.Markdown()
+    results_table = gr.Dataframe(
+    label="📊 Query Results",
+    interactive=False
+)
     
     
 
     ask_button.click(
-        fn=ask_dataset,
-        inputs=[file, question],
-        outputs=answer
-    )    
+    fn=ask_dataset,
+    inputs=[file, question],
+    outputs=[answer, results_table]
+)
 
 if __name__ == "__main__":
     demo.launch()
