@@ -311,30 +311,46 @@ User question:
                 structured_result = json.loads(tool_result)
 
             except json.JSONDecodeError:
-
-                structured_result = {
-                    "success": False,
-                    "error": tool_result
-                }
+                if tool_name == "get_dataset_info":
+                    structured_result = {
+                        "success": True,
+                        "text": tool_result
+                    }
+                else:
+                    structured_result = {
+                        "success": False,
+                        "error": tool_result
+                    }
 
         # --------------------------------------------------
         # 8. Prepare final answer
         # --------------------------------------------------
 
-        if structured_result.get("success"):
+        if structured_result.get("success"):                   
 
-            if "rows" in structured_result:
+            if "text" in structured_result:                     
 
-                total_rows = structured_result.get(
-                    "total_rows",
-                    0
-                )
+                answer = structured_result["text"]             
 
-                answer = (
-                    f"**{total_rows:,} rows match your query.**"
-                )
+            elif "rows" in structured_result:                   
 
-            elif "result" in structured_result:
+                if "total_groups" in structured_result:         
+
+                    total = structured_result["total_groups"]   
+
+                    answer = (
+                        f"**{total:,} groups in the result.**"
+                    )
+
+                else:                                           
+
+                    total = structured_result.get("total_rows", 0)
+
+                    answer = (
+                        f"**{total:,} rows match your query.**"
+                    )
+
+            elif "result" in structured_result:                 
 
                 result = structured_result["result"]
 
@@ -342,13 +358,13 @@ User question:
                     f"**The result is {result:.2f}.**"
                 )
 
-            else:
+            else:                                              
 
                 answer = (
                     "The analysis was completed successfully."
                 )
 
-        else:
+        else:                                                  
 
             answer = (
                 f"❌ {structured_result.get('error', 'Unknown error')}"
@@ -358,15 +374,16 @@ User question:
         # 9. Prepare table
         # --------------------------------------------------
 
-        table_data = None
+        table_data = gr.update(value=None, visible=False)
 
         if (
             structured_result.get("success")
             and "rows" in structured_result
         ):
 
-            table_data = pd.DataFrame(
-                structured_result["rows"]
+            table_data = gr.update(
+                value=pd.DataFrame(structured_result["rows"]),
+                visible=True
             )
 
         # --------------------------------------------------
