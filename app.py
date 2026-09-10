@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import ollama
 from transformers import pipeline
 import json
+import sys
 import asyncio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -90,36 +91,248 @@ def get_columns(file):
 
 
 
-async def call_mcp_tool(tool_name, arguments):
+MAX_STEPS = 4
+
+
+SYSTEM_PROMPT = """
+You are a Data Science Assistant.
+
+Use the MCP tools to answer questions about the uploaded CSV dataset.
+
+Rules:
+
+- Use an MCP tool when the question requires data from the dataset.
+- For average, mean, median, minimum, or maximum use calculate_statistic.
+- For filtering rows use filter_data.
+- For grouping or aggregating by category or time period use group_by.
+- For dataset information use get_dataset_info.
+- Always use an exact column name from the available columns.
+- "average" means statistic = "mean".
+- Do not invent column names.
+- When you have enough information, answer the user in plain language.
+- Be concise. State the numbers you obtained from the tools.
+"""
+
+
+def summarize_tool_result(tool_name, raw_text):
+    """
+    Turn a raw MCP result into a compact summary for the LLM,
+    and a DataFrame for the UI when the result is tabular.
+    """
+
+    table = None
+
+    try:
+        parsed = json.loads(raw_text)
+
+    except json.JSONDecodeError:
+        return raw_text, None
+
+    if not isinstance(parsed, dict):
+        return raw_text, None
+
+    if not parsed.get("success", True):
+        return f"Error: {parsed.get('error', 'unknown error')}", None
+
+    if "rows" in parsed:
+
+        rows = parsed["rows"]
+        table = pd.DataFrame(rows)
+
+        count = parsed.get(
+            "total_groups",
+            parsed.get("total_rows", len(rows))
+        )
+
+        label = "groups" if "total_groups" in parsed else "rows"
+
+        preview = rows[:3]
+
+        summary = (
+            f"{count} {label}. "
+            f"Columns: {parsed.get('columns', [])}. "
+            f"First rows: {json.dumps(preview, default=str)}"
+        )
+
+        return summary, table
+
+    return raw_text, None
+
+
+async def run_agent(file, question, columns, numeric_columns):
+    """
+    Run the agent loop inside a single MCP session.
+    Returns (final_answer, table_data, steps).
+    """
+
+    # --------------------------------------------------
+    # 1. Open a single MCP session for the whole question
+    # --------------------------------------------------
+
     server_params = StdioServerParameters(
-        command="python",
+        command=sys.executable,
         args=["mcp_server.py"],
         env=os.environ.copy()
     )
 
     async with stdio_client(server_params) as (read, write):
+
         async with ClientSession(read, write) as session:
+
             await session.initialize()
 
-            result = await session.call_tool(
-                tool_name,
-                arguments
+            # --------------------------------------------------
+            # 2. Discover MCP tools
+            # --------------------------------------------------
+
+            tools_result = await session.list_tools()
+
+            tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.inputSchema,
+                    }
+                }
+                for tool in tools_result.tools
+            ]
+
+            # --------------------------------------------------
+            # 3. Build the initial conversation
+            # --------------------------------------------------
+
+            messages = [
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Available columns:\n{columns}\n\n"
+                        f"Numerical columns:\n{numeric_columns}\n\n"
+                        f"Dataset file path: {file}\n\n"
+                        f"User question:\n{question}"
+                    )
+                }
+            ]
+
+            table_data = None
+            steps = []
+
+            # --------------------------------------------------
+            # 4. Agent loop
+            # --------------------------------------------------
+
+            for step in range(MAX_STEPS):
+
+                # 4.1 Last step: no tools, force a text answer
+
+                last_step = (step == MAX_STEPS - 1)
+
+                response = ollama.chat(
+                    model="gemma4:e4b",
+                    messages=messages,
+                    tools=None if last_step else tools,
+                )
+
+                message = response["message"]
+
+                # 4.2 No tool call -> final answer, exit the loop
+
+                if not message.get("tool_calls"):
+
+                    return (
+                        message.get("content", "No answer produced."),
+                        table_data,
+                        steps
+                    )
+
+                # 4.3 Read the selected tool
+
+                tool_call = message["tool_calls"][0]
+
+                tool_name = tool_call["function"]["name"]
+                tool_arguments = dict(tool_call["function"]["arguments"])
+
+                # Always point tools at the uploaded file
+                tool_arguments["file_path"] = file
+
+                print("--- STEP", step + 1)
+                print("TOOL:", tool_name)
+                print("ARGS:", tool_arguments)
+
+                # 4.4 Execute the tool on the open session
+
+                try:
+                    result = await session.call_tool(
+                        tool_name,
+                        arguments=tool_arguments
+                    )
+
+                    raw_text = result.content[0].text
+
+                except Exception as tool_error:
+                    raw_text = f"Tool execution failed: {tool_error}"
+
+                print("RESULT:", raw_text[:300])
+
+                # 4.5 Compact result for the LLM, full table for the UI
+
+                summary, table = summarize_tool_result(
+                    tool_name,
+                    raw_text
+                )
+
+                if table is not None:
+                    table_data = table
+
+                steps.append(f"{tool_name} → {summary[:120]}")
+
+                # 4.6 Feed the result back and loop
+
+                messages.append(message)
+
+                messages.append({
+                    "role": "tool",
+                    "tool_name": tool_name,
+                    "content": summary,
+                })
+
+            # --------------------------------------------------
+            # 5. Loop exhausted without a final answer
+            # --------------------------------------------------
+
+            return (
+                "⚠️ Reached the maximum number of steps "
+                "without a final answer.",
+                table_data,
+                steps
             )
 
-            return result
 
 def ask_dataset(file, question):
 
+    # --------------------------------------------------
+    # 1. Validate inputs
+    # --------------------------------------------------
+
     if file is None:
-        return "⚠️ Please upload a CSV file.", None
+        return "⚠️ Please upload a CSV file.", gr.update(
+            value=None, visible=False
+        )
 
     if not question.strip():
-        return "⚠️ Please enter a question.", None
+        return "⚠️ Please enter a question.", gr.update(
+            value=None, visible=False
+        )
 
     try:
 
         # --------------------------------------------------
-        # 1. Read dataset
+        # 2. Read dataset metadata
         # --------------------------------------------------
 
         df = pd.read_csv(file)
@@ -133,271 +346,43 @@ def ask_dataset(file, question):
         )
 
         # --------------------------------------------------
-        # 2. Get MCP tools
+        # 3. Run the agent
         # --------------------------------------------------
 
-        async def get_mcp_tools():
-
-            server_params = StdioServerParameters(
-                command="python",
-                args=["mcp_server.py"],
-                env=os.environ.copy()
-            )
-
-            async with stdio_client(server_params) as (read, write):
-
-                async with ClientSession(read, write) as session:
-
-                    await session.initialize()
-
-                    tools_result = await session.list_tools()
-
-                    tools = []
-
-                    for tool in tools_result.tools:
-
-                        tools.append({
-                            "type": "function",
-                            "function": {
-                                "name": tool.name,
-                                "description": tool.description,
-                                "parameters": tool.inputSchema,
-                            }
-                        })
-
-                    return tools
-
-        tools = asyncio.run(get_mcp_tools())
-
-        # --------------------------------------------------
-        # 3. Ask Gemma which MCP tool to use
-        # --------------------------------------------------
-
-        messages = [
-            {
-                "role": "system",
-                "content": """
-You are a Data Science Assistant.
-
-Use the MCP tools to answer questions about the uploaded CSV dataset.
-
-Rules:
-
-- Use an MCP tool when the question requires data from the dataset.
-- For average, mean, median, minimum, or maximum use calculate_statistic.
-- For filtering rows use filter_data.
-- For dataset information use get_dataset_info.
-- Always use an exact column name from the available columns.
-- "average" means statistic = "mean".
-- If the user asks for average price, identify the most appropriate price-related numerical column.
-- Do not invent column names.
-"""
-            },
-            {
-                "role": "user",
-                "content": f"""
-Available columns:
-
-{columns}
-
-Numerical columns:
-
-{numeric_columns}
-
-User question:
-
-{question}
-"""
-            }
-        ]
-
-        response = ollama.chat(
-            model="gemma4:e4b",
-            messages=messages,
-            tools=tools,
+        answer, table_data, steps = asyncio.run(
+            run_agent(file, question, columns, numeric_columns)
         )
 
-        message = response["message"]
-
         # --------------------------------------------------
-        # 4. Check tool selection
+        # 4. Append the execution trace
         # --------------------------------------------------
 
-        if not message.get("tool_calls"):
-
-            return (
-                message.get(
-                    "content",
-                    "⚠️ The model did not select a data analysis tool."
-                ),
-                None
-            )
+        if steps:
+            trace = "\n".join(f"- {s}" for s in steps)
+            answer = f"{answer}\n\n<sub>Steps: \n{trace}</sub>"
 
         # --------------------------------------------------
-        # 5. Get selected tool
+        # 5. Prepare the table
         # --------------------------------------------------
 
-        tool_call = message["tool_calls"][0]
-
-        tool_name = tool_call["function"]["name"]
-
-        tool_arguments = tool_call["function"]["arguments"]
-
-        print("====================================")
-        print("QUESTION:", question)
-        print("TOOL SELECTED:", tool_name)
-        print("TOOL ARGUMENTS:", tool_arguments)
-        print("====================================")
-
-        # Always use the actual uploaded file
-        tool_arguments["file_path"] = file
-
-        # --------------------------------------------------
-        # 6. Execute MCP tool
-        # --------------------------------------------------
-
-        async def execute_mcp_tool():
-
-            server_params = StdioServerParameters(
-                command="python",
-                args=["mcp_server.py"],
-                env=os.environ.copy()
-            )
-
-            async with stdio_client(server_params) as (read, write):
-
-                async with ClientSession(read, write) as session:
-
-                    await session.initialize()
-
-                    result = await session.call_tool(
-                        tool_name,
-                        arguments=tool_arguments
-                    )
-
-                    return result.content[0].text
-
-        tool_result = asyncio.run(
-            execute_mcp_tool()
-        )
-
-        print("MCP RESULT:", tool_result)
-
-        # --------------------------------------------------
-        # 7. Convert MCP result
-        # --------------------------------------------------
-
-        if tool_name == "calculate_statistic":
-
-            try:
-                numeric_result = float(tool_result)
-
-                structured_result = {
-                    "success": True,
-                    "result": numeric_result
-                }
-
-            except ValueError:
-
-                structured_result = {
-                    "success": False,
-                    "error": tool_result
-                }
-
+        if table_data is not None and not table_data.empty:
+            table_update = gr.update(value=table_data, visible=True)
         else:
-
-            try:
-
-                structured_result = json.loads(tool_result)
-
-            except json.JSONDecodeError:
-                if tool_name == "get_dataset_info":
-                    structured_result = {
-                        "success": True,
-                        "text": tool_result
-                    }
-                else:
-                    structured_result = {
-                        "success": False,
-                        "error": tool_result
-                    }
+            table_update = gr.update(value=None, visible=False)
 
         # --------------------------------------------------
-        # 8. Prepare final answer
+        # 6. Return
         # --------------------------------------------------
 
-        if structured_result.get("success"):                   
-
-            if "text" in structured_result:                     
-
-                answer = structured_result["text"]             
-
-            elif "rows" in structured_result:                   
-
-                if "total_groups" in structured_result:         
-
-                    total = structured_result["total_groups"]   
-
-                    answer = (
-                        f"**{total:,} groups in the result.**"
-                    )
-
-                else:                                           
-
-                    total = structured_result.get("total_rows", 0)
-
-                    answer = (
-                        f"**{total:,} rows match your query.**"
-                    )
-
-            elif "result" in structured_result:                 
-
-                result = structured_result["result"]
-
-                answer = (
-                    f"**The result is {result:.2f}.**"
-                )
-
-            else:                                              
-
-                answer = (
-                    "The analysis was completed successfully."
-                )
-
-        else:                                                  
-
-            answer = (
-                f"❌ {structured_result.get('error', 'Unknown error')}"
-            )
-
-        # --------------------------------------------------
-        # 9. Prepare table
-        # --------------------------------------------------
-
-        table_data = gr.update(value=None, visible=False)
-
-        if (
-            structured_result.get("success")
-            and "rows" in structured_result
-        ):
-
-            table_data = gr.update(
-                value=pd.DataFrame(structured_result["rows"]),
-                visible=True
-            )
-
-        # --------------------------------------------------
-        # 10. Return
-        # --------------------------------------------------
-
-        return answer, table_data
+        return answer, table_update
 
     except Exception as e:
 
         print("ERROR:", str(e))
 
-        return f"❌ Error: {str(e)}", None
-
+        return f"❌ Error: {str(e)}", gr.update(
+            value=None, visible=False
+        )
 
 transcriber = pipeline(
     "automatic-speech-recognition",
