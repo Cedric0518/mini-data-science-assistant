@@ -116,11 +116,9 @@ Rules:
 
 def summarize_tool_result(tool_name, raw_text):
     """
-    Turn a raw MCP result into a compact summary for the LLM,
-    and a DataFrame for the UI when the result is tabular.
+    Read the uniform envelope returned by MCP tools.
+    Returns (summary_for_llm, dataframe_for_ui).
     """
-
-    table = None
 
     try:
         parsed = json.loads(raw_text)
@@ -131,32 +129,14 @@ def summarize_tool_result(tool_name, raw_text):
     if not isinstance(parsed, dict):
         return raw_text, None
 
-    if not parsed.get("success", True):
-        return f"Error: {parsed.get('error', 'unknown error')}", None
+    summary = parsed.get("summary", raw_text)
 
-    if "rows" in parsed:
+    table = None
 
-        rows = parsed["rows"]
-        table = pd.DataFrame(rows)
+    if parsed.get("success") and parsed.get("rows"):
+        table = pd.DataFrame(parsed["rows"])
 
-        count = parsed.get(
-            "total_groups",
-            parsed.get("total_rows", len(rows))
-        )
-
-        label = "groups" if "total_groups" in parsed else "rows"
-
-        preview = rows[:3]
-
-        summary = (
-            f"{count} {label}. "
-            f"Columns: {parsed.get('columns', [])}. "
-            f"First rows: {json.dumps(preview, default=str)}"
-        )
-
-        return summary, table
-
-    return raw_text, None
+    return summary, table
 
 
 async def run_agent(file, question, columns, numeric_columns):

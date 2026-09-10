@@ -1,4 +1,5 @@
 import asyncio
+import json
 from mcp_client import calculate_statistic, filter_data, group_by
 
 
@@ -13,6 +14,7 @@ async def main():
 
     print("MCP RESULT:")
     print(result)
+    print(json.loads(result)["summary"])
 
 
  # Test 2: filter_data
@@ -25,7 +27,7 @@ async def main():
 
     print("\n=== filter_data ===")
     print(result)
-
+    print(json.loads(result)["summary"])
 
 
 # Test 3: group_by
@@ -61,5 +63,6 @@ async def main():
 
     print("\n=== filter_data between dates ===")
     print(result)
+    print(json.loads(result)["summary"])
 
 asyncio.run(main())

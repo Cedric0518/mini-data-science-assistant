@@ -2,13 +2,42 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Data Science Tools")
 
+# --------------------------------------------------
+# Uniform result envelope
+#
+# Every tool returns the same shape:
+#   success, summary, and optional value / rows / columns / count
+# --------------------------------------------------
+
+
+def ok(summary, **fields):
+    """Successful tool result."""
+
+    result = {
+        "success": True,
+        "summary": summary,
+    }
+
+    result.update(fields)
+
+    return result
+
+
+def fail(error):
+    """Failed tool result."""
+
+    return {
+        "success": False,
+        "summary": f"Error: {error}",
+        "error": error,
+    }
 
 @mcp.tool()
 def calculate_statistic(
     file_path: str,
     column: str,
     statistic: str
-) -> float | str:
+) -> dict:
     """
     Calculate a statistic for a numerical column in a CSV dataset.
 
@@ -24,33 +53,35 @@ def calculate_statistic(
         df = pd.read_csv(file_path)
 
         if column not in df.columns:
-            return f"Column '{column}' not found."
+            return fail(f"Column '{column}' not found.")
 
         if not pd.api.types.is_numeric_dtype(df[column]):
-            return f"Column '{column}' is not numerical."
+            return fail(f"Column '{column}' is not numerical.")
 
         series = df[column].dropna()
 
-        if statistic == "mean":
-            return float(series.mean())
+        allowed = ["mean", "median", "min", "max"]
 
-        if statistic == "median":
-            return float(series.median())
+        if statistic not in allowed:
+            return fail(f"Unknown statistic: {statistic}")
 
-        if statistic == "min":
-            return float(series.min())
+        value = float(getattr(series, statistic)())
 
-        if statistic == "max":
-            return float(series.max())
-
-        return f"Unknown statistic: {statistic}"
+        return ok(
+            f"{statistic} of '{column}' = {value:.4f} "
+            f"(computed on {len(series)} values).",
+            value=value,
+            column=column,
+            statistic=statistic,
+            count=int(len(series)),
+        )
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return fail(str(e))
 
 
 @mcp.tool()
-def get_dataset_info(file_path: str) -> str:
+def get_dataset_info(file_path: str) -> dict:
     """
     Return basic information about a CSV dataset.
 
@@ -63,17 +94,25 @@ def get_dataset_info(file_path: str) -> str:
     try:
         df = pd.read_csv(file_path)
 
-        return f"""
-Rows: {df.shape[0]}
-Columns: {df.shape[1]}
-Column names: {list(df.columns)}
-Missing values: {int(df.isna().sum().sum())}
-Duplicate rows: {int(df.duplicated().sum())}
-"""
+        rows = int(df.shape[0])
+        cols = int(df.shape[1])
+        missing = int(df.isna().sum().sum())
+        duplicates = int(df.duplicated().sum())
+
+        return ok(
+            f"{rows} rows, {cols} columns. "
+            f"Columns: {list(df.columns)}. "
+            f"Missing values: {missing}. "
+            f"Duplicate rows: {duplicates}.",
+            columns=list(df.columns),
+            count=rows,
+            n_columns=cols,
+            missing_values=missing,
+            duplicate_rows=duplicates,
+        )
 
     except Exception as e:
-        return f"Error: {str(e)}"
-
+        return fail(str(e))
 
 
 @mcp.tool()
@@ -102,10 +141,7 @@ def filter_data(
         df = pd.read_csv(file_path)
 
         if column not in df.columns:
-            return {
-                "success": False,
-                "error": f"Column '{column}' not found."
-            }
+            return fail(f"Column '{column}' not found.")
 
         series = df[column]
 
@@ -119,10 +155,7 @@ def filter_data(
                 series = pd.to_datetime(series)
 
             except Exception:
-                return {
-                    "success": False,
-                    "error": f"Column '{column}' could not be converted to dates."
-                }
+                return fail(f"Column '{column}' not found.")
 
             # Date range
             if operator == "between":
@@ -130,26 +163,14 @@ def filter_data(
                 dates = [date.strip() for date in value.split(",")]
 
                 if len(dates) != 2:
-                    return {
-                        "success": False,
-                        "error": (
-                            "For 'between', provide two dates "
-                            "in the format YYYY-MM-DD,YYYY-MM-DD."
-                        )
-                    }
+                    return fail(f"Column '{column}' not found.")
 
                 try:
                     start_date = pd.to_datetime(dates[0])
                     end_date = pd.to_datetime(dates[1])
 
                 except Exception:
-                    return {
-                        "success": False,
-                        "error": (
-                            "Invalid date range. "
-                            "Use YYYY-MM-DD,YYYY-MM-DD."
-                        )
-                    }
+                    return fail(f"Column '{column}' not found.")
 
                 filtered = df[
                     (series >= start_date) &
@@ -162,13 +183,7 @@ def filter_data(
                     comparison_value = pd.to_datetime(value)
 
                 except Exception:
-                    return {
-                        "success": False,
-                        "error": (
-                            f"Invalid date value: {value}. "
-                            "Expected format: YYYY-MM-DD."
-                        )
-                    }
+                    return fail(f"Column '{column}' not found.")
 
                 if operator == "==":
                     filtered = df[series == comparison_value]
@@ -189,11 +204,7 @@ def filter_data(
                     filtered = df[series <= comparison_value]
 
                 else:
-                    return {
-                        "success": False,
-                        "error": f"Unknown operator: {operator}"
-                    }
-
+                    return fail(f"Column '{column}' not found.")
         # --------------------------------------------------
         # Numeric / text filtering
         # --------------------------------------------------
@@ -202,13 +213,9 @@ def filter_data(
 
             if operator == "between":
 
-                return {
-                    "success": False,
-                    "error": (
-                        "'between' is currently supported "
-                        "only for date columns."
-                    )
-                }
+                return fail(f"Column '{column}' not found.")
+
+               
 
             try:
                 numeric_value = float(value)
@@ -241,28 +248,25 @@ def filter_data(
                 filtered = df[series <= comparison_value]
 
             else:
-                return {
-                    "success": False,
-                    "error": f"Unknown operator: {operator}"
-                }
+                return fail(f"Column '{column}' not found.")
 
         # --------------------------------------------------
         # Return result
         # --------------------------------------------------
 
-        return {
-            "success": True,
-            "total_rows": len(filtered),
-            "columns": list(filtered.columns),
-            "rows": filtered.to_dict(orient="records")
-        }
+        rows = filtered.to_dict(orient="records")
+
+        return ok(
+            f"{len(rows)} rows matched "
+            f"{column} {operator} {value}.",
+            rows=rows,
+            columns=list(filtered.columns),
+            count=len(rows),
+        )
 
     except Exception as e:
 
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return fail(str(e))
 
 
 @mcp.tool()
@@ -291,26 +295,16 @@ def group_by(
 
         # Check group column
         if group_column not in df.columns:
-            return {
-                "success": False,
-                "error": f"Column '{group_column}' not found."
-            }
+            return fail(f"Column '{group_column}' not found.")
+
 
         # Check aggregation column
         if aggregation_column not in df.columns:
-            return {
-                "success": False,
-                "error": f"Column '{aggregation_column}' not found."
-            }
+            return fail(f"Column '{aggregation_column}' not found.")
 
         # Check numerical aggregation column
         if not pd.api.types.is_numeric_dtype(df[aggregation_column]):
-            return {
-                "success": False,
-                "error": (
-                    f"Column '{aggregation_column}' must be numerical."
-                )
-            }
+            return fail(f"Column '{aggregation_column}' must be numerical.")
 
         # Check aggregation
         allowed_aggregations = [
@@ -322,13 +316,10 @@ def group_by(
         ]
 
         if aggregation not in allowed_aggregations:
-            return {
-                "success": False,
-                "error": (
-                    f"Unknown aggregation: {aggregation}. "
-                    f"Use {', '.join(allowed_aggregations)}."
-                )
-            }
+            return fail(
+                f"Unknown aggregation: {aggregation}. "
+                f"Use {', '.join(allowed_aggregations)}."
+            )
 
         # --------------------------------------------------
         # Handle date grouping
@@ -342,13 +333,10 @@ def group_by(
                 dates = pd.to_datetime(grouping_series)
 
             except Exception:
-                return {
-                    "success": False,
-                    "error": (
-                        f"Column '{group_column}' could not be "
-                        "converted to dates."
-                    )
-                }
+                return fail(
+                    f"Column '{group_column}' could not be "
+                    "converted to dates."
+                )
 
             if time_period == "year":
                 grouping_series = dates.dt.year
@@ -363,13 +351,10 @@ def group_by(
                 grouping_series = dates.dt.date.astype(str)
 
             else:
-                return {
-                    "success": False,
-                    "error": (
-                        f"Unknown time_period: {time_period}. "
-                        "Use year, month, quarter, day, or none."
-                    )
-                }
+                return fail(
+                    f"Unknown time_period: {time_period}. "
+                    "Use year, month, quarter, day, or none."
+                )
 
         # --------------------------------------------------
         # Perform grouping
@@ -392,19 +377,20 @@ def group_by(
             }
         )
 
-        return {
-            "success": True,
-            "total_groups": len(grouped),
-            "columns": list(grouped.columns),
-            "rows": grouped.to_dict(orient="records")
-        }
+        rows = grouped.to_dict(orient="records")
+
+        return ok(
+            f"{len(rows)} groups, "
+            f"{aggregation} of '{aggregation_column}' "
+            f"by '{group_column}'.",
+            rows=rows,
+            columns=list(grouped.columns),
+            count=len(rows),
+        )
 
     except Exception as e:
 
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return fail(str(e))
 
 
 if __name__ == "__main__":
