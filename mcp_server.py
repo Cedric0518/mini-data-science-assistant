@@ -1,3 +1,4 @@
+import pandas as pd
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Data Science Tools")
@@ -32,25 +33,75 @@ def fail(error):
         "error": error,
     }
 
-@mcp.tool()
-def calculate_statistic(
-    file_path: str,
-    column: str,
-    statistic: str
-) -> dict:
-    """
-    Calculate a statistic for a numerical column in a CSV dataset.
 
-    Args:
-        file_path: Path to the CSV file.
-        column: Name of the numerical column.
-        statistic: One of mean, median, min, or max.
+
+# --------------------------------------------------
+# Dataset registry
+#
+# Tools that produce a table store it here and return a short
+# handle. Another tool can then work on that subset by passing
+# the handle as `source` instead of a file path.
+#
+# The registry lives as long as the MCP server process, which
+# is one user question. Nothing to clean up.
+# --------------------------------------------------
+
+import uuid
+
+DATASETS = {}
+
+
+def store(df):
+    """Store a DataFrame and return its handle."""
+
+    handle = f"ds:{uuid.uuid4().hex[:6]}"
+
+    DATASETS[handle] = df
+
+    return handle
+
+
+def resolve(source):
+    """
+    Return a DataFrame from either a handle or a CSV file path.
+    Raises ValueError on an unknown handle.
     """
 
     import pandas as pd
 
+    if isinstance(source, str) and source.startswith("ds:"):
+
+        if source not in DATASETS:
+            raise ValueError(
+                f"Unknown handle: {source}. "
+                "Run the filtering or grouping tool again."
+            )
+
+        return DATASETS[source]
+
+    return pd.read_csv(source)
+
+
+@mcp.tool()
+def calculate_statistic(
+    source: str,
+    column: str,
+    statistic: str
+) -> dict:
+    """
+   Calculate a statistic for a numerical column.
+
+    Args:
+        source: CSV file path, or a handle (ds:xxxxxx) returned
+            by filter_data or group_by to compute on that subset.
+        column: Name of the numerical column.
+        statistic: One of mean, median, min, or max.
+    """
+
+
+
     try:
-        df = pd.read_csv(file_path)
+        df = resolve(source)
 
         if column not in df.columns:
             return fail(f"Column '{column}' not found.")
@@ -81,18 +132,19 @@ def calculate_statistic(
 
 
 @mcp.tool()
-def get_dataset_info(file_path: str) -> dict:
+def get_dataset_info(source: str) -> dict:
     """
-    Return basic information about a CSV dataset.
+    Return basic information about a dataset.
 
     Args:
-        file_path: Path to the CSV file.
+        source: CSV file path, or a handle (ds:xxxxxx) returned
+            by a previous tool call.
     """
 
     import pandas as pd
 
     try:
-        df = pd.read_csv(file_path)
+        df = resolve(source)
 
         rows = int(df.shape[0])
         cols = int(df.shape[1])
@@ -114,19 +166,19 @@ def get_dataset_info(file_path: str) -> dict:
     except Exception as e:
         return fail(str(e))
 
-
 @mcp.tool()
 def filter_data(
-    file_path: str,
+    source: str,
     column: str,
     operator: str,
     value: str
 ) -> dict:
     """
-    Filter rows in a CSV dataset based on a condition.
+    Filter rows in a dataset based on a condition.
 
     Args:
-        file_path: Path to the CSV file.
+        source: CSV file path, or a handle (ds:xxxxxx) from a
+            previous tool call.
         column: Name of the column to filter.
         operator: One of ==, !=, >, <, >=, <=, between.
         value: Value to compare against.
@@ -138,7 +190,7 @@ def filter_data(
     import pandas as pd
 
     try:
-        df = pd.read_csv(file_path)
+        df = resolve(source)
 
         if column not in df.columns:
             return fail(f"Column '{column}' not found.")
@@ -256,9 +308,13 @@ def filter_data(
 
         rows = filtered.to_dict(orient="records")
 
+        handle = store(filtered)
+
         return ok(
-            f"{len(rows)} rows matched "
-            f"{column} {operator} {value}.",
+            f"{len(rows)} rows matched {column} {operator} {value}. "
+            f"To compute a statistic on these rows, "
+            f"call another tool with source=\"{handle}\".",
+            handle=handle,
             rows=rows,
             columns=list(filtered.columns),
             count=len(rows),
@@ -271,7 +327,7 @@ def filter_data(
 
 @mcp.tool()
 def group_by(
-    file_path: str,
+    source: str,
     group_column: str,
     aggregation_column: str,
     aggregation: str,
@@ -291,7 +347,7 @@ def group_by(
     import pandas as pd
 
     try:
-        df = pd.read_csv(file_path)
+        df = resolve(source)
 
         # Check group column
         if group_column not in df.columns:

@@ -18,7 +18,7 @@ async def calculate_statistic(file_path, column, statistic):
             result = await session.call_tool(
                 "calculate_statistic",
                 arguments={
-                    "file_path": file_path,
+                    "source": file_path,
                     "column": column,
                     "statistic": statistic,
                 },
@@ -43,7 +43,7 @@ async def filter_data(file_path, column, operator, value):
             result = await session.call_tool(
                 "filter_data",
                 arguments={
-                    "file_path": file_path,
+                    "source": file_path,
                     "column": column,
                     "operator": operator,
                     "value": value,
@@ -69,7 +69,7 @@ async def get_dataset_info(file_path):
             result = await session.call_tool(
                 "get_dataset_info",
                 arguments={
-                    "file_path": file_path,
+                    "source": file_path,
                 },
             )
 
@@ -97,7 +97,7 @@ async def group_by(
             result = await session.call_tool(
                 "group_by",
                 arguments={
-                    "file_path": file_path,
+                    "source": file_path,
                     "group_column": group_column,
                     "aggregation_column": aggregation_column,
                     "aggregation": aggregation,

@@ -109,8 +109,12 @@ Rules:
 - Always use an exact column name from the available columns.
 - "average" means statistic = "mean".
 - Do not invent column names.
-- When you have enough information, answer the user in plain language.
-- Be concise. State the numbers you obtained from the tools.
+- Tools take a "source" argument.
+- When a tool returns a handle like ds:a1b2c3, that handle refers
+  to the filtered or grouped result.
+- To compute a statistic on a subset, first call filter_data, then
+  call calculate_statistic with source set to the returned handle.
+- Never compute averages or sums yourself. Always use a tool.
 """
 
 
@@ -237,8 +241,13 @@ async def run_agent(file, question, columns, numeric_columns):
                 tool_name = tool_call["function"]["name"]
                 tool_arguments = dict(tool_call["function"]["arguments"])
 
-                # Always point tools at the uploaded file
-                tool_arguments["file_path"] = file
+                # Point the tool at the uploaded file, unless the
+                # model is reusing a handle from a previous step.
+
+                source = tool_arguments.pop("file_path", None)
+
+                if not str(tool_arguments.get("source", "")).startswith("ds:"):
+                    tool_arguments["source"] = file
 
                 print("--- STEP", step + 1)
                 print("TOOL:", tool_name)
