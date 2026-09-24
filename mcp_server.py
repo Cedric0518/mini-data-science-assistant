@@ -81,6 +81,28 @@ def resolve(source):
 
     return pd.read_csv(source)
 
+def find_column(df, name):
+    """
+    Return the actual column name matching `name`.
+
+    Tries an exact match first, then a case- and space-insensitive
+    match. Returns None if nothing matches.
+    """
+
+    if name in df.columns:
+        return name
+
+    target = str(name).strip().lower().replace(" ", "").replace("_", "")
+
+    for actual in df.columns:
+
+        candidate = str(actual).strip().lower().replace(" ", "").replace("_", "")
+
+        if candidate == target:
+            return actual
+
+    return None
+
 
 @mcp.tool()
 def calculate_statistic(
@@ -98,13 +120,20 @@ def calculate_statistic(
         statistic: One of mean, median, min, or max.
     """
 
-
+    import pandas as pd
 
     try:
         df = resolve(source)
 
-        if column not in df.columns:
-            return fail(f"Column '{column}' not found.")
+        resolved = find_column(df, column)
+
+        if resolved is None:
+            return fail(
+                f"Column '{column}' not found. "
+                f"Available columns: {list(df.columns)}"
+            )
+
+        column = resolved
 
         if not pd.api.types.is_numeric_dtype(df[column]):
             return fail(f"Column '{column}' is not numerical.")
@@ -192,11 +221,17 @@ def filter_data(
     try:
         df = resolve(source)
 
-        if column not in df.columns:
-            return fail(f"Column '{column}' not found.")
+        resolved = find_column(df, column)
+
+        if resolved is None:
+            return fail(
+                f"Column '{column}' not found. "
+                f"Available columns: {list(df.columns)}"
+            )
+
+        column = resolved
 
         series = df[column]
-
         # --------------------------------------------------
         # Date filtering
         # --------------------------------------------------
@@ -384,13 +419,25 @@ def group_by(
         df = resolve(source)
 
         # Check group column
-        if group_column not in df.columns:
-            return fail(f"Column '{group_column}' not found.")
+        resolved_group = find_column(df, group_column)
 
+        if resolved_group is None:
+            return fail(
+                f"Column '{group_column}' not found. "
+                f"Available columns: {list(df.columns)}"
+            )
 
-        # Check aggregation column
-        if aggregation_column not in df.columns:
-            return fail(f"Column '{aggregation_column}' not found.")
+        group_column = resolved_group
+
+        resolved_agg = find_column(df, aggregation_column)
+
+        if resolved_agg is None:
+            return fail(
+                f"Column '{aggregation_column}' not found. "
+                f"Available columns: {list(df.columns)}"
+            )
+
+        aggregation_column = resolved_agg
 
         # Check numerical aggregation column
         if not pd.api.types.is_numeric_dtype(df[aggregation_column]):
