@@ -207,22 +207,24 @@ def filter_data(
                 series = pd.to_datetime(series)
 
             except Exception:
-                return fail(f"Column '{column}' not found.")
+                return fail(f"Column '{column}' could not be converted to dates.")
 
-            # Date range
             if operator == "between":
 
                 dates = [date.strip() for date in value.split(",")]
 
                 if len(dates) != 2:
-                    return fail(f"Column '{column}' not found.")
+                    return fail(
+                        "For 'between', provide two dates "
+                        "in the format YYYY-MM-DD,YYYY-MM-DD."
+                    )
 
                 try:
                     start_date = pd.to_datetime(dates[0])
                     end_date = pd.to_datetime(dates[1])
 
                 except Exception:
-                    return fail(f"Column '{column}' not found.")
+                    return fail("Invalid date range. Use YYYY-MM-DD,YYYY-MM-DD.")
 
                 filtered = df[
                     (series >= start_date) &
@@ -235,7 +237,10 @@ def filter_data(
                     comparison_value = pd.to_datetime(value)
 
                 except Exception:
-                    return fail(f"Column '{column}' not found.")
+                    return fail(
+                        f"Invalid date value: {value}. "
+                        "Expected format: YYYY-MM-DD."
+                    )
 
                 if operator == "==":
                     filtered = df[series == comparison_value]
@@ -256,7 +261,8 @@ def filter_data(
                     filtered = df[series <= comparison_value]
 
                 else:
-                    return fail(f"Column '{column}' not found.")
+                    return fail(f"Unknown operator: {operator}")
+
         # --------------------------------------------------
         # Numeric / text filtering
         # --------------------------------------------------
@@ -265,42 +271,70 @@ def filter_data(
 
             if operator == "between":
 
-                return fail(f"Column '{column}' not found.")
+                bounds = [b.strip() for b in value.split(",")]
 
-               
+                if len(bounds) != 2:
+                    return fail(
+                        "For 'between', provide two values "
+                        "separated by a comma, e.g. '50,60'."
+                    )
 
-            try:
-                numeric_value = float(value)
-                is_numeric = pd.api.types.is_numeric_dtype(series)
+                try:
+                    low = float(bounds[0])
+                    high = float(bounds[1])
 
-            except ValueError:
-                is_numeric = False
+                except ValueError:
+                    return fail(
+                        f"Invalid numeric range: {value}. "
+                        "Expected two numbers, e.g. '50,60'."
+                    )
 
-            if is_numeric:
-                comparison_value = numeric_value
-            else:
-                comparison_value = value
+                if not pd.api.types.is_numeric_dtype(series):
+                    return fail(
+                        f"'between' requires a numerical or date column. "
+                        f"'{column}' is neither."
+                    )
 
-            if operator == "==":
-                filtered = df[series == comparison_value]
-
-            elif operator == "!=":
-                filtered = df[series != comparison_value]
-
-            elif operator == ">":
-                filtered = df[series > comparison_value]
-
-            elif operator == "<":
-                filtered = df[series < comparison_value]
-
-            elif operator == ">=":
-                filtered = df[series >= comparison_value]
-
-            elif operator == "<=":
-                filtered = df[series <= comparison_value]
+                filtered = df[
+                    (series >= low) &
+                    (series <= high)
+                ]
 
             else:
-                return fail(f"Column '{column}' not found.")
+
+                try:
+                    numeric_value = float(value)
+                    is_numeric = pd.api.types.is_numeric_dtype(series)
+
+                except ValueError:
+                    is_numeric = False
+
+                if is_numeric:
+                    comparison_value = numeric_value
+                else:
+                    comparison_value = value
+
+                if operator == "==":
+                    filtered = df[series == comparison_value]
+
+                elif operator == "!=":
+                    filtered = df[series != comparison_value]
+
+                elif operator == ">":
+                    filtered = df[series > comparison_value]
+
+                elif operator == "<":
+                    filtered = df[series < comparison_value]
+
+                elif operator == ">=":
+                    filtered = df[series >= comparison_value]
+
+                elif operator == "<=":
+                    filtered = df[series <= comparison_value]
+
+                else:
+                    return fail(f"Unknown operator: {operator}")
+        
 
         # --------------------------------------------------
         # Return result

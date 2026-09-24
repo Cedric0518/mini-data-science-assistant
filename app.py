@@ -206,9 +206,12 @@ async def run_agent(file, question, columns, numeric_columns):
             table_data = None
             steps = []
 
-            # --------------------------------------------------
+                        # --------------------------------------------------
             # 4. Agent loop
             # --------------------------------------------------
+
+            last_error_signature = None
+            consecutive_errors = 0
 
             for step in range(MAX_STEPS):
 
@@ -244,7 +247,7 @@ async def run_agent(file, question, columns, numeric_columns):
                 # Point the tool at the uploaded file, unless the
                 # model is reusing a handle from a previous step.
 
-                source = tool_arguments.pop("file_path", None)
+                tool_arguments.pop("file_path", None)
 
                 if not str(tool_arguments.get("source", "")).startswith("ds:"):
                     tool_arguments["source"] = file
@@ -278,9 +281,32 @@ async def run_agent(file, question, columns, numeric_columns):
                 if table is not None:
                     table_data = table
 
-                steps.append(f"{tool_name} → {summary[:120]}")
+                steps.append(f"{tool_name} → {summary[:200]}")
 
-                # 4.6 Feed the result back and loop
+                # 4.6 Stop if the same call fails twice in a row
+
+                if summary.startswith("Error"):
+
+                    signature = f"{tool_name}:{tool_arguments}"
+
+                    if signature == last_error_signature:
+                        consecutive_errors += 1
+                    else:
+                        consecutive_errors = 1
+                        last_error_signature = signature
+
+                    if consecutive_errors >= 2:
+                        return (
+                            f"The analysis could not be completed: {summary}",
+                            table_data,
+                            steps
+                        )
+
+                else:
+                    consecutive_errors = 0
+                    last_error_signature = None
+
+                # 4.7 Feed the result back and loop
 
                 messages.append(message)
 
@@ -289,7 +315,6 @@ async def run_agent(file, question, columns, numeric_columns):
                     "tool_name": tool_name,
                     "content": summary,
                 })
-
             # --------------------------------------------------
             # 5. Loop exhausted without a final answer
             # --------------------------------------------------
