@@ -103,6 +103,39 @@ def find_column(df, name):
 
     return None
 
+def as_datetime(series):
+    """
+    Return the series converted to datetime, or None if it isn't
+    a date column.
+
+    Detects by content rather than by column name, so trade_date,
+    created_at or order_date are handled like Date.
+    """
+
+    import pandas as pd
+
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return series
+
+    if pd.api.types.is_numeric_dtype(series):
+        return None
+
+    try:
+        converted = pd.to_datetime(series, errors="coerce")
+
+    except Exception:
+        return None
+
+    # Treat it as a date column only if almost everything parsed
+    non_null = series.notna().sum()
+
+    if non_null == 0:
+        return None
+
+    parsed_ratio = converted.notna().sum() / non_null
+
+    return converted if parsed_ratio >= 0.9 else None
+
 
 @mcp.tool()
 def calculate_statistic(
@@ -242,13 +275,11 @@ def filter_data(
         # Date filtering
         # --------------------------------------------------
 
-        if column.lower() == "date":
+        as_dates = as_datetime(series)
 
-            try:
-                series = pd.to_datetime(series)
+        if as_dates is not None:
 
-            except Exception:
-                return fail(f"Column '{column}' could not be converted to dates.")
+            series = as_dates
 
             # --------------------------------------------------
             # Date component filtering
@@ -520,10 +551,10 @@ def group_by(
 
         if time_period != "none":
 
-            try:
-                dates = pd.to_datetime(grouping_series)
 
-            except Exception:
+            dates = as_datetime(grouping_series)
+
+            if dates is None:
                 return fail(
                     f"Column '{group_column}' could not be "
                     "converted to dates."

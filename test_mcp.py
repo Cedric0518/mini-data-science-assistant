@@ -62,4 +62,15 @@ async def main():
     print(result)
     print(json.loads(result)["summary"])
 
+
+    result = await filter_data(
+        "./test_renamed.csv",
+        "trade_date",
+        "month_is",
+        "6",
+    )
+
+    print("\n=== renamed date column ===")
+    print(result)
+
 asyncio.run(main())
