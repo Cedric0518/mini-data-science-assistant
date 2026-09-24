@@ -195,6 +195,7 @@ def get_dataset_info(source: str) -> dict:
     except Exception as e:
         return fail(str(e))
 
+
 @mcp.tool()
 def filter_data(
     source: str,
@@ -209,11 +210,15 @@ def filter_data(
         source: CSV file path, or a handle (ds:xxxxxx) from a
             previous tool call.
         column: Name of the column to filter.
-        operator: One of ==, !=, >, <, >=, <=, between.
+        operator: One of ==, !=, >, <, >=, <=, between, and for date
+            columns also year_is, month_is, day_is.
         value: Value to compare against.
 
-        For 'between' with a date column, provide:
-        'YYYY-MM-DD,YYYY-MM-DD'
+        For 'between' with a date column: 'YYYY-MM-DD,YYYY-MM-DD'
+        For 'between' with a numerical column: '50,60'
+        For year_is: '2025' means the year 2025.
+        For month_is: '6' means June of every year.
+        For day_is: '1,10' means the first 10 days of every month.
     """
 
     import pandas as pd
@@ -232,6 +237,7 @@ def filter_data(
         column = resolved
 
         series = df[column]
+
         # --------------------------------------------------
         # Date filtering
         # --------------------------------------------------
@@ -244,7 +250,50 @@ def filter_data(
             except Exception:
                 return fail(f"Column '{column}' could not be converted to dates.")
 
-            if operator == "between":
+            # --------------------------------------------------
+            # Date component filtering
+            #
+            # year_is / month_is / day_is compare a part of the
+            # date rather than the full date, so "every June" or
+            # "the first 10 days of any month" become expressible.
+            # A single value matches exactly; "a,b" matches a range.
+            # --------------------------------------------------
+
+            if operator in ("year_is", "month_is", "day_is"):
+
+                part = {
+                    "year_is": series.dt.year,
+                    "month_is": series.dt.month,
+                    "day_is": series.dt.day,
+                }[operator]
+
+                bounds = [b.strip() for b in str(value).split(",")]
+
+                try:
+                    numbers = [int(b) for b in bounds]
+
+                except ValueError:
+                    return fail(
+                        f"Invalid value for {operator}: {value}. "
+                        "Expected a number, or two numbers as 'low,high'."
+                    )
+
+                if len(numbers) == 1:
+                    filtered = df[part == numbers[0]]
+
+                elif len(numbers) == 2:
+                    filtered = df[
+                        (part >= numbers[0]) &
+                        (part <= numbers[1])
+                    ]
+
+                else:
+                    return fail(
+                        f"Invalid value for {operator}: {value}. "
+                        "Expected one or two numbers."
+                    )
+
+            elif operator == "between":
 
                 dates = [date.strip() for date in value.split(",")]
 
@@ -303,6 +352,12 @@ def filter_data(
         # --------------------------------------------------
 
         else:
+
+            if operator in ("year_is", "month_is", "day_is"):
+                return fail(
+                    f"'{operator}' only applies to a date column. "
+                    f"'{column}' is not one."
+                )
 
             if operator == "between":
 
@@ -369,7 +424,6 @@ def filter_data(
 
                 else:
                     return fail(f"Unknown operator: {operator}")
-        
 
         # --------------------------------------------------
         # Return result

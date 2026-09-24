@@ -6,24 +6,21 @@ from mcp_client import calculate_statistic, filter_data, group_by
 async def main():
 
     # Test 1: calculate_statistic
-    result = await calculate_statistic(
-        "./uber_stock_data.csv",
-        "Open",
-        "mean",
-    )
+   # result = await calculate_statistic(
+   #     "./uber_stock_data.csv",
+   #     "Open",
+   #     "mean",
+   # )
 
-    print("MCP RESULT:")
-    print(result)
-    print(json.loads(result)["summary"])
+    #print("MCP RESULT:")
+   # print(result)
+   # print(json.loads(result)["summary"])
 
 
  # Test 2: filter_data
-    result = await filter_data(
-        "./uber_stock_data.csv",
-        "Open",
-        ">",
-        "50",
-    )
+    result = await filter_data("./uber_stock_data.csv", "Date", "month_is", "6")
+    print("\n=== every June ===")
+    print(result)
 
     print("\n=== filter_data ===")
     print(result)
