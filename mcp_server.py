@@ -615,5 +615,248 @@ def group_by(
         return fail(str(e))
 
 
+
+@mcp.tool()
+def detect_missing_values(source: str) -> dict:
+    """
+    Report missing values per column in a dataset.
+
+    Args:
+        source: CSV file path, or a handle (ds:xxxxxx) from a
+            previous tool call.
+    """
+
+    import pandas as pd
+
+    try:
+        df = resolve(source)
+
+        total_rows = len(df)
+
+        if total_rows == 0:
+            return fail("The dataset is empty.")
+
+        counts = df.isna().sum()
+
+        rows = [
+            {
+                "column": col,
+                "missing": int(counts[col]),
+                "percent": round(100 * counts[col] / total_rows, 2),
+            }
+            for col in df.columns
+            if counts[col] > 0
+        ]
+
+        if not rows:
+            return ok(
+                f"No missing values in any of the {len(df.columns)} columns.",
+                rows=[],
+                columns=["column", "missing", "percent"],
+                count=0,
+            )
+
+        worst = max(rows, key=lambda r: r["missing"])
+
+        return ok(
+            f"{len(rows)} columns have missing values out of "
+            f"{len(df.columns)}. Worst: '{worst['column']}' with "
+            f"{worst['missing']} missing ({worst['percent']}%).",
+            rows=rows,
+            columns=["column", "missing", "percent"],
+            count=len(rows),
+        )
+
+    except Exception as e:
+        return fail(str(e))
+
+
+@mcp.tool()
+def detect_outliers(
+    source: str,
+    column: str,
+    method: str = "iqr"
+) -> dict:
+    """
+    Find outlier rows in a numerical column.
+
+    Args:
+        source: CSV file path, or a handle (ds:xxxxxx) from a
+            previous tool call.
+        column: Name of the numerical column.
+        method: 'iqr' (1.5 x interquartile range, the default) or
+            'zscore' (more than 3 standard deviations from the mean).
+    """
+
+    import pandas as pd
+
+    try:
+        df = resolve(source)
+
+        resolved = find_column(df, column)
+
+        if resolved is None:
+            return fail(
+                f"Column '{column}' not found. "
+                f"Available columns: {list(df.columns)}"
+            )
+
+        column = resolved
+
+        if not pd.api.types.is_numeric_dtype(df[column]):
+            return fail(f"Column '{column}' is not numerical.")
+
+        series = df[column]
+
+        if method == "iqr":
+
+            q1 = series.quantile(0.25)
+            q3 = series.quantile(0.75)
+            iqr = q3 - q1
+
+            low = q1 - 1.5 * iqr
+            high = q3 + 1.5 * iqr
+
+            mask = (series < low) | (series > high)
+
+            bounds_text = f"outside [{low:.4f}, {high:.4f}]"
+
+        elif method == "zscore":
+
+            mean = series.mean()
+            std = series.std()
+
+            if std == 0:
+                return fail(
+                    f"Column '{column}' has no variation; "
+                    "z-score outliers are undefined."
+                )
+
+            mask = ((series - mean).abs() / std) > 3
+
+            bounds_text = f"more than 3 standard deviations from {mean:.4f}"
+
+        else:
+            return fail(f"Unknown method: {method}. Use 'iqr' or 'zscore'.")
+
+        outliers = df[mask.fillna(False)]
+
+        rows = outliers.to_dict(orient="records")
+
+        handle = store(outliers)
+
+        return ok(
+            f"{len(rows)} outliers in '{column}' ({method}, {bounds_text}), "
+            f"out of {len(df)} rows. "
+            f"To analyse them further, call another tool with "
+            f"source=\"{handle}\".",
+            handle=handle,
+            rows=rows,
+            columns=list(outliers.columns),
+            count=len(rows),
+        )
+
+    except Exception as e:
+        return fail(str(e))
+
+
+@mcp.tool()
+def correlation_analysis(
+    source: str,
+    column_a: str = "",
+    column_b: str = ""
+) -> dict:
+    """
+    Measure linear correlation between numerical columns.
+
+    With no columns given, returns the strongest correlated pairs
+    across the whole dataset. With two columns given, returns that
+    single correlation.
+
+    Args:
+        source: CSV file path, or a handle (ds:xxxxxx) from a
+            previous tool call.
+        column_a: Optional first column.
+        column_b: Optional second column.
+    """
+
+    import pandas as pd
+
+    try:
+        df = resolve(source)
+
+        numeric = df.select_dtypes(include="number")
+
+        if numeric.shape[1] < 2:
+            return fail(
+                "At least two numerical columns are needed "
+                "to compute a correlation."
+            )
+
+        # Single pair
+        if column_a and column_b:
+
+            resolved_a = find_column(numeric, column_a)
+            resolved_b = find_column(numeric, column_b)
+
+            if resolved_a is None or resolved_b is None:
+                return fail(
+                    f"Numerical columns needed. "
+                    f"Available: {list(numeric.columns)}"
+                )
+
+            value = float(numeric[resolved_a].corr(numeric[resolved_b]))
+
+            return ok(
+                f"Correlation between '{resolved_a}' and "
+                f"'{resolved_b}' = {value:.4f}.",
+                value=value,
+                column_a=resolved_a,
+                column_b=resolved_b,
+            )
+
+        # All pairs
+        matrix = numeric.corr()
+
+        pairs = []
+
+        cols = list(matrix.columns)
+
+        for i, a in enumerate(cols):
+            for b in cols[i + 1:]:
+
+                value = matrix.loc[a, b]
+
+                if pd.notna(value):
+                    pairs.append({
+                        "column_a": a,
+                        "column_b": b,
+                        "correlation": round(float(value), 4),
+                    })
+
+        pairs.sort(key=lambda p: abs(p["correlation"]), reverse=True)
+
+        top = pairs[:10]
+
+        strongest = top[0] if top else None
+
+        summary = (
+            f"{len(pairs)} column pairs compared. "
+            f"Strongest: '{strongest['column_a']}' and "
+            f"'{strongest['column_b']}' at {strongest['correlation']}."
+            if strongest else "No correlation could be computed."
+        )
+
+        return ok(
+            summary,
+            rows=top,
+            columns=["column_a", "column_b", "correlation"],
+            count=len(top),
+        )
+
+    except Exception as e:
+        return fail(str(e))
+
+
 if __name__ == "__main__":
     mcp.run()
