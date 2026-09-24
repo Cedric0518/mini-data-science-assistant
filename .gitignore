@@ -4,4 +4,6 @@ __pycache__/
 .DS_Store
 .continue/
 
+test_renamed.csv
+
 uber_stock_data.csv
