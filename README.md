@@ -136,11 +136,35 @@ The `summary` field is what the model reads. The rest is for the UI.
 
 ## Agent loop
 
-`run_agent()` in `app.py` opens one MCP session per question and loops up
-to 4 steps. At each step the model either calls a tool or produces a final
-answer. On the last step tools are withheld, forcing a text response. The
-loop also stops early if the model repeats an identical failing call twice
-in a row.
+The agent is a LangGraph state graph, defined in `agent_graph.py`.
+
+```mermaid
+graph TD
+    S([Start]) --> agent
+    agent -.->|tool call| tools
+    agent -.->|final answer| E([End])
+    tools -.->|continue| agent
+    tools -.->|same call failed twice| E
+```
+
+- **State**: the conversation, a step counter, the execution trace, the
+  last table, error tracking and the final answer. Lists (`messages`,
+  `steps`) use an append reducer; every other field is replaced.
+- **`agent` node**: calls Gemma with the conversation and the MCP tools.
+  On the 4th step tools are withheld, forcing a text answer.
+- **`tools` node**: runs the requested MCP tool and appends its summary
+  to the conversation.
+- **Routing**: nodes write `final_answer`; routing functions only read
+  it to decide whether to stop.
+
+One MCP session per question. The graph is built inside that session and
+its nodes reach it through a closure, so every tool call in a question
+hits the same server process and the same dataset registry. That is what
+keeps `ds:` handles valid from one tool to the next. MCP adapters that
+open a new session per tool call would break this, so the graph calls
+`session.call_tool()` directly.
+
+The hand-written loop it replaced is in the git history (`989df578`).
 
 ## Stack
 
@@ -150,6 +174,7 @@ in a row.
 - **Pandas** — data operations
 - **Whisper** (`openai/whisper-small`) — local voice input
 - **Matplotlib** — histograms
+- **LangGraph**: agent orchestration as a state graph
 
 ## Running locally
 
@@ -187,6 +212,7 @@ llm_mcp_test.py  LLM + MCP integration test
 - [x] Multi-step agent loop
 - [x] Tool chaining through dataset handles
 - [x] More tools: outliers, correlations, missing values
+- [x] Agent rebuilt as a LangGraph state graph
 - [ ] RAG for business context and column definitions
 - [ ] Deployment on a self-hosted VPS
 
