@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .continue/
-
+*.rag/
 test_renamed.csv
 
 uber_stock_data.csv
