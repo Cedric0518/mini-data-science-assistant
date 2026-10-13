@@ -12,7 +12,7 @@ from mcp.client.stdio import stdio_client
 
 
 MODEL = "gemma4:e4b"
-MAX_STEPS = 4
+MAX_STEPS = 5
 
 
 
@@ -28,6 +28,12 @@ Rules:
 - For filtering rows use filter_data.
 - For grouping or aggregating by category or time period use group_by.
 - For dataset information use get_dataset_info.
+- For the meaning of a column or term, its units, or background about
+  the dataset, use search_context with the user's question as query.
+- If a question needs both a definition and a number, use search_context
+  and the data tools.
+- Do not explain what a column means from your own knowledge when
+  search_context can answer it.
 - Always use an exact column name from the available columns.
 - "average" means statistic = "mean".
 - Do not invent column names.

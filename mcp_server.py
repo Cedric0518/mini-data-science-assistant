@@ -858,5 +858,53 @@ def correlation_analysis(
         return fail(str(e))
 
 
+
+# --------------------------------------------------
+# Contexte : recherche dans la description du dataset (RAG)
+# --------------------------------------------------
+
+import rag
+
+
+@mcp.tool()
+def search_context(source: str, query: str) -> dict:
+    """
+    Search the dataset's description document for the meaning of a column,
+    a definition, units, or background about the data.
+
+    Use it when the question asks what something means or why it matters.
+    It does not compute anything: use the other tools for numbers.
+    """
+
+    try:
+
+        if str(source).startswith("ds:"):
+            return fail(
+                "search_context needs the dataset file, not a ds: handle."
+            )
+
+        if rag.description_path(source) is None:
+            return ok(
+                "This dataset has no description document. "
+                "Answer from the data only, and say that no description is available.",
+                count=0,
+            )
+
+        hits = rag.search(source, query, k=3)
+
+        passages = "\n\n".join(
+            f"[{i}] {hit['text']}" for i, hit in enumerate(hits, start=1)
+        )
+
+        return ok(
+            "Passages from the dataset description, most relevant first:\n\n"
+            f"{passages}\n\n"
+            "Answer from these passages. If they do not cover the question, say so.",
+            count=len(hits),
+            titles=[hit["title"] for hit in hits],
+        )
+
+    except Exception as e:
+        return fail(str(e))
 if __name__ == "__main__":
     mcp.run()

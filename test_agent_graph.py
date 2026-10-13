@@ -11,6 +11,8 @@ QUESTIONS = [
     "What was the average opening price during the first 10 days of January 2025?",
     "What was the average opening price during the first 10 days of each month in 2024?",
     "What is the average value of the Revenue column?",
+    "What does Adj Close mean in this dataset?",
+    "What does Adj Close mean, and what was its average value in 2024?",
 ]
 
 
