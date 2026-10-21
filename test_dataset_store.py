@@ -1,7 +1,7 @@
 """
 Tests for dataset_store.py.  Run: python test_dataset_store.py
 
-Every test works in a temporary store, never in your real datasets/ folder.
+Every test gets its own temporary folder, never your real sessions/ folder.
 The description tests need Ollama running with nomic-embed-text.
 Exit code 0 if everything passes, 1 otherwise.
 """
@@ -33,46 +33,46 @@ def write(folder, name, text):
 
 
 # --------------------------------------------------
-# 1. Identité et idempotence
+# 1. Identité et idempotence (dans une session)
 # --------------------------------------------------
 
-def test_same_content_same_id(tmp):
-    first = dataset_store.add_dataset(write(tmp, "uber_stock_data.csv", CSV_TEXT))
-    second = dataset_store.add_dataset(write(tmp, "uber.csv", CSV_TEXT))
+def test_same_content_same_id(tmp, root):
+    first = dataset_store.add_dataset(root, write(tmp, "uber_stock_data.csv", CSV_TEXT))
+    second = dataset_store.add_dataset(root, write(tmp, "uber.csv", CSV_TEXT))
 
     assert first == second, (first, second)
     assert len(first) == dataset_store.ID_LENGTH
-    assert len(list(dataset_store.STORE_DIR.iterdir())) == 1
+    assert len(list(root.iterdir())) == 1
 
     # Le premier nom est conservé
-    assert dataset_store.load_meta(first)["original_name"] == "uber_stock_data.csv"
+    assert dataset_store.load_meta(root, first)["original_name"] == "uber_stock_data.csv"
 
 
-def test_modified_content_new_id(tmp):
-    first = dataset_store.add_dataset(write(tmp, "a.csv", CSV_TEXT))
-    second = dataset_store.add_dataset(write(tmp, "b.csv", CSV_TEXT + "2024-01-04,12,13\n"))
+def test_modified_content_new_id(tmp, root):
+    first = dataset_store.add_dataset(root, write(tmp, "a.csv", CSV_TEXT))
+    second = dataset_store.add_dataset(root, write(tmp, "b.csv", CSV_TEXT + "2024-01-04,12,13\n"))
 
     assert first != second
 
 
-def test_csv_is_never_overwritten(tmp):
-    dataset_id = dataset_store.add_dataset(write(tmp, "a.csv", CSV_TEXT))
-    stored = dataset_store.dataset_csv(dataset_id)
+def test_csv_is_never_overwritten(tmp, root):
+    dataset_id = dataset_store.add_dataset(root, write(tmp, "a.csv", CSV_TEXT))
+    stored = dataset_store.dataset_csv(root, dataset_id)
     before = stored.stat().st_mtime_ns
 
-    dataset_store.add_dataset(write(tmp, "again.csv", CSV_TEXT))
+    dataset_store.add_dataset(root, write(tmp, "again.csv", CSV_TEXT))
 
     assert stored.stat().st_mtime_ns == before
     assert stored.read_text(encoding="utf-8") == CSV_TEXT
 
 
-def test_csv_path_is_absolute_and_unknown_id_fails(tmp):
-    dataset_id = dataset_store.add_dataset(write(tmp, "a.csv", CSV_TEXT))
+def test_csv_path_is_absolute_and_unknown_id_fails(tmp, root):
+    dataset_id = dataset_store.add_dataset(root, write(tmp, "a.csv", CSV_TEXT))
 
-    assert dataset_store.dataset_csv(dataset_id).is_absolute()
+    assert dataset_store.dataset_csv(root, dataset_id).is_absolute()
 
     try:
-        dataset_store.dataset_csv("0000000000000000")
+        dataset_store.dataset_csv(root, "0000000000000000")
     except FileNotFoundError:
         return
 
@@ -80,14 +80,42 @@ def test_csv_path_is_absolute_and_unknown_id_fails(tmp):
 
 
 # --------------------------------------------------
-# 2. Descriptions refusées
+# 2. Isolation entre sessions
 # --------------------------------------------------
 
-def test_unsupported_format_is_refused(tmp):
-    dataset_id = dataset_store.add_dataset(write(tmp, "a.csv", CSV_TEXT))
+def test_sessions_are_isolated(tmp, root):
+    alice = Path(tmp) / "alice"
+    bob = Path(tmp) / "bob"
+    csv = write(tmp, "a.csv", CSV_TEXT)
+
+    alice_id = dataset_store.add_dataset(alice, csv)
+    bob_id = dataset_store.add_dataset(bob, csv)
+
+    # Même contenu, même identifiant... mais deux dossiers distincts
+    assert alice_id == bob_id
+    assert dataset_store.dataset_csv(alice, alice_id) != dataset_store.dataset_csv(bob, bob_id)
+
+    # Une description écrite par Alice n'apparaît pas chez Bob
+    (dataset_store.dataset_dir(alice, alice_id) / "data.md").write_text("Alice's notes")
+    assert dataset_store.has_description(alice, alice_id)
+    assert not dataset_store.has_description(bob, bob_id)
+
+
+def test_new_session_ids_are_unique(tmp, root):
+    ids = {dataset_store.new_session_id() for _ in range(100)}
+
+    assert len(ids) == 100
+
+
+# --------------------------------------------------
+# 3. Descriptions refusées
+# --------------------------------------------------
+
+def test_unsupported_format_is_refused(tmp, root):
+    dataset_id = dataset_store.add_dataset(root, write(tmp, "a.csv", CSV_TEXT))
 
     try:
-        dataset_store.set_description_file(dataset_id, write(tmp, "doc.pdf", "fake"))
+        dataset_store.set_description_file(root, dataset_id, write(tmp, "doc.pdf", "fake"))
     except ValueError as error:
         assert ".pdf" in str(error)
         return
@@ -95,43 +123,43 @@ def test_unsupported_format_is_refused(tmp):
     raise AssertionError("a .pdf description should be refused for now")
 
 
-def test_empty_description_is_refused(tmp):
-    dataset_id = dataset_store.add_dataset(write(tmp, "a.csv", CSV_TEXT))
+def test_empty_description_is_refused(tmp, root):
+    dataset_id = dataset_store.add_dataset(root, write(tmp, "a.csv", CSV_TEXT))
 
     try:
-        dataset_store.set_description_text(dataset_id, "   \n  ")
+        dataset_store.set_description_text(root, dataset_id, "   \n  ")
     except ValueError:
-        assert not dataset_store.has_description(dataset_id)
+        assert not dataset_store.has_description(root, dataset_id)
         return
 
     raise AssertionError("an empty description should be refused")
 
 
 # --------------------------------------------------
-# 3. Descriptions acceptées (Ollama requis)
+# 4. Descriptions acceptées (Ollama requis)
 # --------------------------------------------------
 
-def test_pasted_description_is_indexed(tmp):
-    dataset_id = dataset_store.add_dataset(write(tmp, "a.csv", CSV_TEXT))
+def test_pasted_description_is_indexed(tmp, root):
+    dataset_id = dataset_store.add_dataset(root, write(tmp, "a.csv", CSV_TEXT))
 
-    count = dataset_store.set_description_text(dataset_id, DESCRIPTION)
+    count = dataset_store.set_description_text(root, dataset_id, DESCRIPTION)
 
     assert count == 2, count
-    assert dataset_store.has_description(dataset_id)
+    assert dataset_store.has_description(root, dataset_id)
 
-    hits = rag.search(dataset_store.dataset_csv(dataset_id), "What is the opening price?", k=1)
+    hits = rag.search(dataset_store.dataset_csv(root, dataset_id), "What is the opening price?", k=1)
     assert hits[0]["title"] == "Open", hits
 
 
-def test_uploaded_file_and_replacement(tmp):
-    dataset_id = dataset_store.add_dataset(write(tmp, "a.csv", CSV_TEXT))
-    csv_path = dataset_store.dataset_csv(dataset_id)
+def test_uploaded_file_and_replacement(tmp, root):
+    dataset_id = dataset_store.add_dataset(root, write(tmp, "a.csv", CSV_TEXT))
+    csv_path = dataset_store.dataset_csv(root, dataset_id)
 
-    assert dataset_store.set_description_file(dataset_id, write(tmp, "doc.md", DESCRIPTION)) == 2
+    assert dataset_store.set_description_file(root, dataset_id, write(tmp, "doc.md", DESCRIPTION)) == 2
 
     # Remplacer la description reconstruit l'index : pas d'erreur "out of date"
     new_description = DESCRIPTION + "\n## Volume\nVolume is the number of shares traded.\n"
-    assert dataset_store.set_description_file(dataset_id, write(tmp, "doc.txt", new_description)) == 3
+    assert dataset_store.set_description_file(root, dataset_id, write(tmp, "doc.txt", new_description)) == 3
 
     titles = [hit["title"] for hit in rag.search(csv_path, "How many shares were traded?", k=1)]
     assert titles == ["Volume"], titles
@@ -148,28 +176,27 @@ def main():
         ("modified content, new id", test_modified_content_new_id),
         ("csv is never overwritten", test_csv_is_never_overwritten),
         ("absolute csv path, unknown id fails", test_csv_path_is_absolute_and_unknown_id_fails),
+        ("sessions are isolated", test_sessions_are_isolated),
+        ("new session ids are unique", test_new_session_ids_are_unique),
         ("unsupported format is refused", test_unsupported_format_is_refused),
         ("empty description is refused", test_empty_description_is_refused),
         ("pasted description is indexed", test_pasted_description_is_indexed),
         ("uploaded file and replacement", test_uploaded_file_and_replacement),
     ]
 
-    real_store = dataset_store.STORE_DIR
     failures = 0
 
     for name, test in tests:
 
-        # Chaque test a son propre store temporaire, vide au départ
+        # Chaque test a son propre dossier temporaire, vide au départ
         with tempfile.TemporaryDirectory() as tmp:
-            dataset_store.STORE_DIR = Path(tmp) / "datasets"
+            root = Path(tmp) / "session"
             try:
-                test(tmp)
+                test(tmp, root)
                 print(f"PASS  {name}")
             except AssertionError as error:
                 failures += 1
                 print(f"FAIL  {name}\n      {error}")
-            finally:
-                dataset_store.STORE_DIR = real_store
 
     print(f"\n{len(tests) - failures}/{len(tests)} passed")
 
