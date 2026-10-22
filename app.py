@@ -188,16 +188,29 @@ def transcribe_audio(audio):
 def on_csv_upload(session_id, file):
     """Store the uploaded CSV in this visitor's session folder."""
     if file is None:
-        return None, "", gr.update(choices=[], value=None)
+        return None, "", gr.update(choices=[], value=None), "", ""
 
     root = dataset_store.session_root(session_id)
     try:
         dataset_id = dataset_store.add_dataset(root, file, original_name=Path(file).name)
     except Exception as e:
-        return None, f"❌ Error: {e}", gr.update(choices=[], value=None)
+        return None, f"❌ Error: {e}", gr.update(choices=[], value=None), "", ""
 
     name = dataset_store.load_meta(root, dataset_id).get("original_name", "Dataset")
-    return dataset_id, f"✅ **{name}** loaded (`{dataset_id}`)", get_columns(session_id, dataset_id)
+
+    # Tell the truth about THIS dataset, not the previous one
+    if dataset_store.has_description(root, dataset_id):
+        description_info = "📝 This dataset already has a description."
+    else:
+        description_info = "📝 No description yet: the assistant will answer from the data only."
+
+    return (
+        dataset_id,
+        f"✅ **{name}** loaded (`{dataset_id}`)",
+        get_columns(session_id, dataset_id),
+        description_info,
+        "",  # clear the pasted text
+    )
 
 
 def on_description_text(session_id, dataset_id, text):
@@ -366,5 +379,11 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
     outputs=[answer, results_table]
 )
 
+    file.change(
+        fn=on_csv_upload,
+        inputs=[current_session, file],
+        outputs=[current_dataset, dataset_status, column_dropdown,
+                 description_status, description_text]
+    )
 if __name__ == "__main__":
     demo.launch()
