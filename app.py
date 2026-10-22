@@ -33,7 +33,7 @@ def analyze_dataset(session_id, dataset_id):
         duplicates = int(df.duplicated().sum())
 
         overview = f"""
-### 📋 Dataset Overview
+### Dataset Overview
 
 - **Rows:** {rows:,}
 - **Columns:** {columns:,}
@@ -54,7 +54,7 @@ def analyze_dataset(session_id, dataset_id):
         return overview, statistics, df.head(10)
 
     except Exception as e:
-        return f"❌ Error: {str(e)}", None, None
+        return f"Error: {str(e)}", None, None
 
 
 def create_histogram(session_id, dataset_id, column):
@@ -99,21 +99,25 @@ def get_columns(session_id, dataset_id):
         return gr.update(choices=[], value=None)
 
 
-def ask_dataset(session_id, dataset_id, question):
+def ask_dataset(session_id, dataset_id, question, history):
+
+    # --------------------------------------------------
+    # 1. Validate inputs
+    # --------------------------------------------------
+
+    history = history or []
+    hide_table = gr.update(value=None, visible=False)
 
     # --------------------------------------------------
     # 1. Validate inputs
     # --------------------------------------------------
 
     if not dataset_id:
-        return "⚠️ Please upload a CSV file.", gr.update(
-            value=None, visible=False
-        )
+        warning = {"role": "assistant", "content": "Please upload a CSV file."}
+        return history + [warning], question, hide_table
 
     if not question.strip():
-        return "⚠️ Please enter a question.", gr.update(
-            value=None, visible=False
-        )
+        return history, "", hide_table
 
     try:
 
@@ -162,15 +166,21 @@ def ask_dataset(session_id, dataset_id, question):
         # 6. Return
         # --------------------------------------------------
 
-        return answer, table_update
+        history = history + [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer},
+        ]
+        return history, "", table_update
 
     except Exception as e:
 
         print("ERROR:", str(e))
 
-        return f"❌ Error: {str(e)}", gr.update(
-            value=None, visible=False
-        )
+        history = history + [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": f"Error: {str(e)}"},
+        ]
+        return history, "", hide_table
 
 transcriber = pipeline(
     "automatic-speech-recognition",
@@ -188,43 +198,44 @@ def transcribe_audio(audio):
 def on_csv_upload(session_id, file):
     """Store the uploaded CSV in this visitor's session folder."""
     if file is None:
-        return None, "", gr.update(choices=[], value=None), "", ""
+        return None, "", gr.update(choices=[], value=None), "", "", [ ]
 
     root = dataset_store.session_root(session_id)
     try:
         dataset_id = dataset_store.add_dataset(root, file, original_name=Path(file).name)
     except Exception as e:
-        return None, f"❌ Error: {e}", gr.update(choices=[], value=None), "", ""
+        return None, f"Error: {e}", gr.update(choices=[], value=None), "", "", []
 
     name = dataset_store.load_meta(root, dataset_id).get("original_name", "Dataset")
 
     # Tell the truth about THIS dataset, not the previous one
     if dataset_store.has_description(root, dataset_id):
-        description_info = "📝 This dataset already has a description."
+        description_info = "This dataset already has a description."
     else:
-        description_info = "📝 No description yet: the assistant will answer from the data only."
+        description_info = "No description yet: the assistant will answer from the data only."
 
     return (
         dataset_id,
-        f"✅ **{name}** loaded (`{dataset_id}`)",
+        f"**{name}** loaded (`{dataset_id}`)",
         get_columns(session_id, dataset_id),
         description_info,
         "",  # clear the pasted text
+        []  # new dataset, new conversation 
     )
 
 
 def on_description_text(session_id, dataset_id, text):
     """Save a pasted description for the current dataset and index it."""
     if not dataset_id:
-        return "⚠️ Load a CSV first."
+        return "Load a CSV first."
 
     root = dataset_store.session_root(session_id)
     try:
         count = dataset_store.set_description_text(root, dataset_id, text)
     except Exception as e:
-        return f"❌ Error: {e}"
+        return f"Error: {e}"
 
-    return f"✅ Description saved ({count} passages indexed)."
+    return f"Description saved ({count} passages indexed)."
 
 
 def on_description_file(session_id, dataset_id, doc):
@@ -232,21 +243,25 @@ def on_description_file(session_id, dataset_id, doc):
     if doc is None:
         return ""
     if not dataset_id:
-        return "⚠️ Load a CSV first."
+        return "Load a CSV first."
 
     root = dataset_store.session_root(session_id)
     try:
         count = dataset_store.set_description_file(root, dataset_id, doc)
     except Exception as e:
-        return f"❌ Error: {e}"
+        return f"Error: {e}"
 
-    return f"✅ **{Path(doc).name}** saved ({count} passages indexed)."
+    return f"**{Path(doc).name}** saved ({count} passages indexed)."
+
+def hide_results_table():
+    """The chat was emptied: the last results table no longer applies."""
+    return gr.update(value=None, visible=False)
 
 with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
     gr.Markdown(
         """
-        # 📊 Mini Data Science Assistant
+        # Mini Data Science Assistant
 
         Upload a CSV file and quickly explore your dataset.
         """
@@ -268,7 +283,7 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
     dataset_status = gr.Markdown()
 
-    with gr.Accordion("📝 Dataset description (optional)", open=False):
+    with gr.Accordion("Dataset description (optional)", open=False):
         gr.Markdown(
             "Explain what the columns mean, their units and the context. "
             "The assistant uses it to answer questions about meaning."
@@ -278,7 +293,7 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
             lines=8,
             placeholder="## entropy\nEntropy of the image, computed from...",
         )
-        save_description_button = gr.Button("💾 Save description")
+        save_description_button = gr.Button("Save description")
         description_file = gr.File(
             label="...or upload a .md / .txt file",
             file_types=[".md", ".txt"],
@@ -287,21 +302,21 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         description_status = gr.Markdown()
 
     analyze_button = gr.Button(
-        "🔎 Analyze Dataset",
+        "Analyze Dataset",
         variant="primary"
     )
 
     overview = gr.Markdown()
 
     statistics = gr.Dataframe(
-        label="📈 Numerical Statistics"
+        label="Numerical Statistics"
     )
 
     preview = gr.Dataframe(
-        label="👀 Dataset Preview"
+        label="Dataset Preview"
     )
 
-    gr.Markdown("## 📊 Visualization")
+    gr.Markdown("## Visualization")
 
     column_dropdown = gr.Dropdown(
         label="Select a numerical column",
@@ -341,17 +356,19 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         inputs=[current_session, current_dataset, description_file],
         outputs=description_status,
     )
-    gr.Markdown("## 🤖 Ask Your Dataset")
+    gr.Markdown("## Ask Your Dataset")
+
+    chatbot = gr.Chatbot(label="Conversation", height=450)
     
     voice_input = gr.Audio(
         sources=["microphone"],
         type="filepath",
-        label="🎤 Ask by voice"
+        label="Ask by voice"
     )
 
     question = gr.Textbox(
-        label="Ask a question",
-        placeholder="What can you tell me about this dataset?"
+        label="Your message",
+        placeholder="Start a conversation about your dataset...",
     )
 
     voice_input.change(
@@ -361,29 +378,60 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
     )
     
     ask_button = gr.Button(
-        "🤖 Ask",
+        "Send",
         variant="primary"
     )
-    
-    answer = gr.Markdown()
+
     results_table = gr.Dataframe(
-    label="📊 Query Results",
+        label="Query Results",
+        interactive=False
+    )
+    
+    question.submit(
+            fn=ask_dataset,
+            inputs=[current_session, current_dataset, question, chatbot],
+            outputs=[chatbot, question, results_table]
+        )
+
+    
+    chatbot.clear(
+        fn=hide_results_table,
+        outputs=results_table
+    )
+    
+    results_table = gr.Dataframe(
+    label="Query Results",
     interactive=False
 )
+
+    question.submit(
+        fn=ask_dataset,
+        inputs=[current_session, current_dataset, question, chatbot],
+        outputs=[chatbot, question, results_table]
+    )
+
+    chatbot.clear(
+        fn=hide_results_table,
+        outputs=results_table
+    )
     
     
 
     ask_button.click(
-    fn=ask_dataset,
-    inputs=[current_session, current_dataset, question],
-    outputs=[answer, results_table]
-)
+        fn=ask_dataset,
+        inputs=[current_session, current_dataset, question, chatbot],
+        outputs=[chatbot, question, results_table]
+    )
+
+    
+
+    
 
     file.change(
         fn=on_csv_upload,
         inputs=[current_session, file],
         outputs=[current_dataset, dataset_status, column_dropdown,
-                 description_status, description_text]
+                 description_status, description_text, chatbot]
     )
 if __name__ == "__main__":
     demo.launch()

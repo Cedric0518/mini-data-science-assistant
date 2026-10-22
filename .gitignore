@@ -5,6 +5,6 @@ __pycache__/
 .continue/
 *.rag/
 test_renamed.csv
-session/
+sessions/
 
 uber_stock_data.csv

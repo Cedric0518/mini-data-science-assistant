@@ -35,7 +35,7 @@ async def main():
                     }
                 })
 
-            print("\n🔧 MCP TOOLS:")
+            print("\nMCP TOOLS:")
             for tool in tools:
                 print("-", tool["function"]["name"])
 
@@ -75,7 +75,7 @@ The available dataset file is:
 
             message = response["message"]
 
-            print("\n🤖 LLM RESPONSE:")
+            print("\nLLM RESPONSE:")
             print(message)
 
             # Check if LLM wants to call a tool
@@ -86,10 +86,10 @@ The available dataset file is:
                 tool_name = tool_call["function"]["name"]
                 arguments = tool_call["function"]["arguments"]
 
-                print("\n🛠️ TOOL SELECTED:")
+                print("\nTOOL SELECTED:")
                 print(tool_name)
 
-                print("\n📋 ARGUMENTS:")
+                print("\nARGUMENTS:")
                 print(arguments)
 
                 # Execute MCP tool
@@ -100,7 +100,7 @@ The available dataset file is:
 
                 tool_result = result.content[0].text
 
-                print("\n📊 MCP RESULT:")
+                print("\nMCP RESULT:")
                 print(tool_result)
 
                 # Send result back to Gemma
@@ -117,14 +117,14 @@ The available dataset file is:
                     messages=messages,
                 )
 
-                print("\n💬 FINAL ANSWER:")
+                print("\nFINAL ANSWER:")
                 print(
                     final_response["message"]["content"]
                 )
 
             else:
 
-                print("\n💬 LLM DID NOT CALL A TOOL")
+                print("\nLLM DID NOT CALL A TOOL")
                 print(message.get("content"))
 
 

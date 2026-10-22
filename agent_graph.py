@@ -121,7 +121,7 @@ def build_graph(session, tools, file):
         # Gemma veut encore un outil alors que le budget est épuisé
         elif step >= MAX_STEPS:
             update["final_answer"] = (
-                "⚠️ Reached the maximum number of steps "
+                "Reached the maximum number of steps "
                 "without a final answer."
             )
 
