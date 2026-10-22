@@ -42,3 +42,39 @@ the description status, so the interface always reflects the current dataset.
 
 **Consequences.** Without a description, the agent says so instead of guessing.
 PDF and other formats are not supported yet.
+
+## D4. The chat history is the agent's memory
+
+**Context.** A single question box made every question independent: "multiply
+that mean by 2" could not work, and the interface did not suggest it should.
+LangGraph checkpointers could persist the whole agent state between questions.
+
+**Decision.** The question box became a `gr.Chatbot`. Its history, which is
+already scoped to the browser session, is passed to the agent: the last 6
+messages, questions and final answers only, with the tool trace removed.
+Loading another CSV empties the conversation.
+
+**Consequences.**
+- What the visitor sees is exactly what the agent remembers.
+- No `ds:` handle from an earlier question reaches the model. Those handles died
+  with the previous MCP process, so the agent recomputes instead of reusing them.
+- A checkpointer was not used: it would also persist control fields
+  (`final_answer`, step counters) and outlive the browser session.
+
+## D5. Fixed tools, not model-generated code
+
+**Context.** Asking for "the first 10 rows" failed because no tool selected rows
+by position. Letting the model write and run its own Pandas code would remove
+the need for new tools.
+
+**Decision.** The agent only calls documented MCP tools. Missing capabilities are
+added as general tools (`select_rows` handles first and last N rows).
+
+**Consequences.**
+- No code written by the model runs on the server. On a public app, that code
+  could be steered by any visitor through the question, a CSV cell or a
+  description, and could read other sessions' files.
+- A small model picks among tools more reliably than it writes correct code, and
+  each step stays readable in the trace.
+- Each new kind of question may need a tool. A read-only SQL tool (DuckDB) is the
+  candidate for more flexibility with a much smaller attack surface.

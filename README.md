@@ -15,10 +15,12 @@ short_description: Lightweight Gradio app to explore and understand CSV dataset
 # Mini Data Science Assistant
 
 An agentic data science assistant. Upload a CSV, optionally with a
-document describing it, ask a question in plain English, and a local LLM
-decides which tools to run, chains them together, and explains the result.
+document describing it, then have a conversation about it in plain language.
+A local LLM decides which tools to run, chains them together, and explains
+the result. Follow-up questions like "and multiplied by 2?" work.
 
-Everything runs locally. No API keys, no cloud inference.
+Everything runs locally. No API keys, no cloud inference. Each visitor gets
+an isolated session: uploads, descriptions and conversations are never shared.
 
 ## What it does
 
@@ -44,20 +46,37 @@ description first:
    value in 2024 was 70.7668."
 ```
 
-The model plans the steps. It does not compute anything itself.
+Follow-up questions build on the conversation:
+
+```
+"What is the mean of the first 15 rows of skewness?"
+→ select_rows         : first 15 rows                            → ds:...
+→ calculate_statistic : mean of skewness on those 15 rows        → 4.8918
+
+"And if I multiply that mean by 2?"
+→ (no tool, the value comes from the conversation)               → 9.7836
+
+"Now the mean of the last 20 rows of variance, compared to the first one?"
+→ select_rows         : last 20 rows                             → ds:...
+→ calculate_statistic : mean of variance                         → -2.0655
+→ select_rows         : first 15 rows                            → ds:...
+→ calculate_statistic : mean of skewness                         → 4.8918
+```
+
+The model plans the steps. Every number from the data comes from a tool.
 
 ## Architecture
 
 ```
 User question
       ↓
-   Gemma 8B              understand + plan
+   Gemma 4 E4B           understand + plan
       ↓
   MCP tools              expose capabilities
    ↙        ↘
 Pandas    RAG search     compute on the data / read the dataset's description
    ↘        ↙
-   Gemma 8B              synthesize
+   Gemma 4 E4B           synthesize
       ↓
    Answer
 ```
@@ -90,7 +109,8 @@ Two consequences:
 - The model never receives the rows. It gets a count, the column names,
   and the handle. A 437-row filter costs the same context as a 6-row one.
 - The registry lives inside a single MCP session, which lasts exactly one
-  user question. Nothing to clean up, no cross-question leakage.
+  user question. Nothing to clean up, no cross-question leakage. A follow-up
+  question never reuses an old handle: the agent runs the tools again.
 
 Chains are not limited to two steps:
 
@@ -110,6 +130,7 @@ Chains are not limited to two steps:
 | `get_dataset_info` | Rows, columns, missing values, duplicates |
 | `calculate_statistic` | mean, median, min, max on a numerical column |
 | `filter_data` | Filter rows by condition, date range, or date component |
+| `select_rows` | Keep the first or last N rows, in file order |
 | `group_by` | Group and aggregate, with optional time period |
 | `detect_missing_values` | Per-column missing value report |
 | `detect_outliers` | Outlier detection by IQR or z-score |
@@ -151,14 +172,19 @@ The `summary` field is what the model reads. The rest is for the UI.
 
 ## Dataset descriptions (RAG)
 
-A dataset can come with a description document. It lives next to the CSV,
-with the same name:
+A dataset can come with a description document: column meanings, units,
+context. In the web interface, paste it or upload a `.md` / `.txt` file in
+the "Dataset description" section after loading a CSV. It is saved next to
+the stored dataset and indexed immediately:
 
 ```
-uber_stock_data.csv      the data
-uber_stock_data.md       its description (.md or .txt, optional)
-uber_stock_data.rag/     its index, generated
+sessions/<session>/<dataset>/data.csv     the data
+sessions/<session>/<dataset>/data.md      its description (optional)
+sessions/<session>/<dataset>/data.rag/    its index, generated
 ```
+
+Outside the interface, the same convention works for any CSV: a `.md` or
+`.txt` file with the same name, next to it.
 
 Knowledge belongs to the dataset, not to the application. Two datasets
 never share passages, and a dataset without a description still works:
@@ -192,6 +218,46 @@ decides when it needs a filter.
 `test_rag.py` covers chunking, naming, the guard rails, and a small
 evaluation set: each question must find its passage in the top 3.
 
+## Sessions
+
+The app is meant to be public, without user accounts. Every browser tab gets
+its own session id (`gr.State(dataset_store.new_session_id)`), and everything
+a visitor uploads lives in `sessions/<session_id>/`.
+
+Inside a session, datasets are content-addressed: a file is stored under the
+first 16 characters of its SHA-256 hash. Uploading the same file twice is a
+no-op, and the agent always reads an immutable copy. Two visitors uploading
+the same file get two separate copies, so one visitor's description never
+leaks to the other.
+
+Refreshing the page starts a new session. That is a deliberate trade-off for
+a demo tool. See [docs/DECISIONS.md](docs/DECISIONS.md) for the reasoning
+behind this and other choices.
+
+## Conversation
+
+The question box is a chat. The chat history is the agent's memory: what the
+visitor sees is exactly what the agent receives, nothing more.
+
+- Only the last 6 messages are sent, to keep a small model focused.
+- The tool trace is stripped from past answers before they reach the model.
+  Its `ds:` handles belonged to the MCP process of an earlier question and no
+  longer exist.
+- Loading another CSV empties the conversation, so a follow-up can never mix
+  two datasets.
+
+## Why fixed tools, not generated code
+
+The agent could write its own Pandas code instead of calling tools. That is
+more flexible, but this is a public app: executing model-written code means
+executing code that any visitor can steer, through the question, a CSV cell
+or a description. It would also make wrong answers harder to spot, and a small
+model writes buggy code more often than it picks the wrong tool.
+
+So the agent only chooses among small, documented tools, and capabilities are
+added by making tools more general (`select_rows` covers first and last N
+rows). A read-only SQL tool is the candidate for more flexibility later.
+
 ## Agent loop
 
 The agent is a LangGraph state graph, defined in `agent_graph.py`.
@@ -205,7 +271,8 @@ graph TD
     tools -.->|same call failed twice| E
 ```
 
-- **State**: the conversation, a step counter, the execution trace, the
+- **State**: the conversation (recent chat history plus the current
+  question), a step counter, the execution trace, the
   last table, error tracking and the final answer. Lists (`messages`,
   `steps`) use an append reducer; every other field is replaced.
 - **`agent` node**: calls Gemma with the conversation and the MCP tools.
@@ -226,8 +293,8 @@ The hand-written loop it replaced is in the git history (`989df578`).
 
 ## Stack
 
-- **Gradio** — web interface
-- **Ollama + Gemma 8B** (`gemma4:e4b`, Q4_K_M) — local reasoning
+- **Gradio** — web interface and chat
+- **Ollama + Gemma 4 E4B** (`gemma4:e4b`, Q4_K_M) — local reasoning
 - **MCP** (`mcp==1.29.1`, FastMCP) — tool protocol
 - **Pandas** — data operations
 - **Whisper** (`openai/whisper-small`) — local voice input
@@ -254,7 +321,8 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The app opens on `http://localhost:7860`. Upload a CSV and ask away.
+The app opens on `http://localhost:7860`. Upload a CSV, optionally add a
+description, and start a conversation.
 
 To try the description search, put `uber_stock_data.csv` next to the example
 description `uber_stock_data.md` (the CSV itself is not in the repository),
@@ -265,8 +333,6 @@ python rag.py build uber_stock_data.csv
 python test_agent_graph.py
 ```
 
-The web interface does not accept a description upload yet: see the roadmap.
-
 ## Project files
 
 ```
@@ -274,10 +340,13 @@ app.py               Gradio interface
 agent_graph.py       LangGraph agent: state, nodes, routing, entry point
 mcp_server.py        MCP server, tools, dataset registry
 rag.py               Chunking, embeddings, index and search over descriptions
+dataset_store.py     Session-scoped, content-addressed dataset storage
+docs/DECISIONS.md    Design decisions and their trade-offs
 mcp_client.py        Async wrappers for direct tool calls
 uber_stock_data.md   Example description document
 test_mcp.py          Tool tests without the LLM
 test_rag.py          Retrieval tests and evaluation set
+test_dataset_store.py Storage and session isolation tests
 test_agent_graph.py  End-to-end agent test, data and description questions
 llm_mcp_test.py      LLM + MCP integration test
 ```
@@ -291,8 +360,12 @@ llm_mcp_test.py      LLM + MCP integration test
 - [x] More tools: outliers, correlations, missing values
 - [x] Agent rebuilt as a LangGraph state graph
 - [x] RAG over each dataset's own description document
-- [ ] Description upload in the web interface
-- [ ] Deployment on a self-hosted VPS
+- [x] Session-scoped dataset store, no user accounts
+- [x] Description upload in the web interface
+- [x] Chat interface with follow-up questions
+- [ ] Evaluation suite for the agent: answer accuracy, failure rates
+- [ ] Read-only SQL tool (DuckDB) as a safer alternative to generated code
+- [ ] Deployment on a self-hosted VPS, with session cleanup
 
 ## License
 
