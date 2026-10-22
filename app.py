@@ -99,6 +99,29 @@ def get_columns(session_id, dataset_id):
         return gr.update(choices=[], value=None)
 
 
+MAX_HISTORY_MESSAGES = 6
+
+
+def history_for_agent(history):
+    """Turn the visible chat into plain role/text messages for the agent."""
+    messages = []
+
+    for message in history[-MAX_HISTORY_MESSAGES:]:
+        content = message["content"]
+
+        # Gradio 6 stores content as blocks: [{"type": "text", "text": "..."}]
+        if isinstance(content, list):
+            content = " ".join(
+                block.get("text", "") for block in content if isinstance(block, dict)
+            )
+
+        # Drop the tool trace: its ds: handles died with the previous MCP process
+        content = content.split("\n\n<sub>Steps:")[0]
+
+        messages.append({"role": message["role"], "content": content})
+
+    return messages
+
 def ask_dataset(session_id, dataset_id, question, history):
 
     # --------------------------------------------------
@@ -142,7 +165,7 @@ def ask_dataset(session_id, dataset_id, question, history):
         # --------------------------------------------------
 
         answer, table_data, steps = asyncio.run(
-            run_agent(csv_path, question, columns, numeric_columns)
+            run_agent(csv_path, question, columns, numeric_columns, history_for_agent(history))
         )
 
         # --------------------------------------------------
@@ -386,7 +409,7 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         label="Query Results",
         interactive=False
     )
-    
+
     question.submit(
             fn=ask_dataset,
             inputs=[current_session, current_dataset, question, chatbot],

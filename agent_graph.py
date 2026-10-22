@@ -43,6 +43,7 @@ Rules:
 - To compute a statistic on a subset, first call filter_data, then
   call calculate_statistic with source set to the returned handle.
 - Never compute averages or sums yourself. Always use a tool.
+- Earlier messages are the conversation so far. Use them to understand references like "this mean" or "that column", but call the tools again whenever you need data.
 """
 
 def summarize_tool_result(tool_name, raw_text):
@@ -217,7 +218,7 @@ def build_graph(session, tools, file):
 # 3. Point d'entrée : une question = une session MCP = un graphe
 # --------------------------------------------------
 
-async def run_agent(file, question, columns, numeric_columns):
+async def run_agent(file, question, columns, numeric_columns, history=None):
     """
     Answer one question with the LangGraph agent.
     Returns (final_answer, table_data, steps), same contract as the
@@ -255,6 +256,7 @@ async def run_agent(file, question, columns, numeric_columns):
             initial_state = {
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
+                    *(history or []),
                     {
                         "role": "user",
                         "content": (
