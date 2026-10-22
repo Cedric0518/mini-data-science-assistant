@@ -200,6 +200,34 @@ def on_csv_upload(session_id, file):
     return dataset_id, f"✅ **{name}** loaded (`{dataset_id}`)", get_columns(session_id, dataset_id)
 
 
+def on_description_text(session_id, dataset_id, text):
+    """Save a pasted description for the current dataset and index it."""
+    if not dataset_id:
+        return "⚠️ Load a CSV first."
+
+    root = dataset_store.session_root(session_id)
+    try:
+        count = dataset_store.set_description_text(root, dataset_id, text)
+    except Exception as e:
+        return f"❌ Error: {e}"
+
+    return f"✅ Description saved ({count} passages indexed)."
+
+
+def on_description_file(session_id, dataset_id, doc):
+    """Save an uploaded .md/.txt description for the current dataset and index it."""
+    if doc is None:
+        return ""
+    if not dataset_id:
+        return "⚠️ Load a CSV first."
+
+    root = dataset_store.session_root(session_id)
+    try:
+        count = dataset_store.set_description_file(root, dataset_id, doc)
+    except Exception as e:
+        return f"❌ Error: {e}"
+
+    return f"✅ **{Path(doc).name}** saved ({count} passages indexed)."
 
 with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
@@ -224,7 +252,26 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
     # The dataset_id of the CSV loaded in this session
     current_dataset = gr.State(None)
 
+
     dataset_status = gr.Markdown()
+
+    with gr.Accordion("📝 Dataset description (optional)", open=False):
+        gr.Markdown(
+            "Explain what the columns mean, their units and the context. "
+            "The assistant uses it to answer questions about meaning."
+        )
+        description_text = gr.Textbox(
+            label="Paste a description",
+            lines=8,
+            placeholder="## entropy\nEntropy of the image, computed from...",
+        )
+        save_description_button = gr.Button("💾 Save description")
+        description_file = gr.File(
+            label="...or upload a .md / .txt file",
+            file_types=[".md", ".txt"],
+            type="filepath",
+        )
+        description_status = gr.Markdown()
 
     analyze_button = gr.Button(
         "🔎 Analyze Dataset",
@@ -269,7 +316,18 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         inputs=[current_session, current_dataset, column_dropdown],
         outputs=plot
     )
-    
+
+    save_description_button.click(
+        fn=on_description_text,
+        inputs=[current_session, current_dataset, description_text],
+        outputs=description_status,
+    )
+
+    description_file.upload(
+        fn=on_description_file,
+        inputs=[current_session, current_dataset, description_file],
+        outputs=description_status,
+    )
     gr.Markdown("## 🤖 Ask Your Dataset")
     
     voice_input = gr.Audio(
