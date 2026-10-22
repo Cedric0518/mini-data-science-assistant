@@ -478,6 +478,50 @@ def filter_data(
 
         return fail(str(e))
 
+@mcp.tool()
+def select_rows(source: str, count: int, position: str = "first") -> dict:
+    """
+    Keep only the first or last rows of a dataset, in file order.
+
+    Use this for questions like "the first 10 rows" or "the last 50 rows".
+
+    Args:
+        source: CSV file path, or a handle (ds:xxxxxx) from a
+            previous tool call.
+        count: Number of rows to keep (a positive integer).
+        position: "first" or "last".
+    """
+
+    try:
+        df = resolve(source)
+
+        count = int(count)
+
+        if count <= 0:
+            return fail("count must be a positive integer.")
+
+        if position == "first":
+            selected = df.head(count)
+        elif position == "last":
+            selected = df.tail(count)
+        else:
+            return fail(f"Unknown position: {position}. Use 'first' or 'last'.")
+
+        handle = store(selected)
+
+        return ok(
+            f"Kept the {position} {len(selected)} rows. "
+            f"To compute a statistic on these rows, "
+            f"call another tool with source=\"{handle}\".",
+            handle=handle,
+            rows=selected.to_dict(orient="records"),
+            columns=list(selected.columns),
+            count=len(selected),
+        )
+
+    except Exception as e:
+        return fail(str(e))
+
 
 @mcp.tool()
 def group_by(
