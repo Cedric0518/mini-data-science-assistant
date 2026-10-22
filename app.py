@@ -3,16 +3,29 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from transformers import pipeline
 import asyncio
+from pathlib import Path
+
+import dataset_store
 
 from agent_graph import run_agent
 
-    
-def analyze_dataset(file):
-    if file is None:
+
+def stored_csv(session_id, dataset_id):
+    """Path of the stored CSV in this session, or None when no dataset is loaded."""
+
+    if not dataset_id:
+        return None
+
+    root = dataset_store.session_root(session_id)
+
+    return dataset_store.dataset_csv(root, dataset_id)
+
+def analyze_dataset(session_id, dataset_id):
+    if not dataset_id:
         return "Please upload a CSV file.", None, None
 
     try:
-        df = pd.read_csv(file)
+        df = pd.read_csv(stored_csv(session_id, dataset_id))
 
         # Dataset overview
         rows, columns = df.shape
@@ -44,12 +57,12 @@ def analyze_dataset(file):
         return f"❌ Error: {str(e)}", None, None
 
 
-def create_histogram(file, column):
-    if file is None:
+def create_histogram(session_id, dataset_id, column):
+    if not dataset_id:
         return None
 
     try:
-        df = pd.read_csv(file)
+        df = pd.read_csv(stored_csv(session_id, dataset_id))
 
         if column not in df.columns:
             return None
@@ -69,12 +82,12 @@ def create_histogram(file, column):
         return None
 
 
-def get_columns(file):
-    if file is None:
+def get_columns(session_id, dataset_id):
+    if not dataset_id:
         return gr.update(choices=[], value=None)
 
     try:
-        df = pd.read_csv(file)
+        df = pd.read_csv(stored_csv(session_id, dataset_id))
         numeric_columns = df.select_dtypes(include="number").columns.tolist()
 
         return gr.update(
@@ -86,13 +99,13 @@ def get_columns(file):
         return gr.update(choices=[], value=None)
 
 
-def ask_dataset(file, question):
+def ask_dataset(session_id, dataset_id, question):
 
     # --------------------------------------------------
     # 1. Validate inputs
     # --------------------------------------------------
 
-    if file is None:
+    if not dataset_id:
         return "⚠️ Please upload a CSV file.", gr.update(
             value=None, visible=False
         )
@@ -108,7 +121,9 @@ def ask_dataset(file, question):
         # 2. Read dataset metadata
         # --------------------------------------------------
 
-        df = pd.read_csv(file)
+        csv_path = str(stored_csv(session_id, dataset_id))
+
+        df = pd.read_csv(csv_path)
 
         columns = df.columns.tolist()
 
@@ -123,7 +138,7 @@ def ask_dataset(file, question):
         # --------------------------------------------------
 
         answer, table_data, steps = asyncio.run(
-            run_agent(file, question, columns, numeric_columns)
+            run_agent(csv_path, question, columns, numeric_columns)
         )
 
         # --------------------------------------------------
@@ -170,7 +185,22 @@ def transcribe_audio(audio):
     result = transcriber(audio)
     return result["text"]
 
-    
+def on_csv_upload(session_id, file):
+    """Store the uploaded CSV in this visitor's session folder."""
+    if file is None:
+        return None, "", gr.update(choices=[], value=None)
+
+    root = dataset_store.session_root(session_id)
+    try:
+        dataset_id = dataset_store.add_dataset(root, file, original_name=Path(file).name)
+    except Exception as e:
+        return None, f"❌ Error: {e}", gr.update(choices=[], value=None)
+
+    name = dataset_store.load_meta(root, dataset_id).get("original_name", "Dataset")
+    return dataset_id, f"✅ **{name}** loaded (`{dataset_id}`)", get_columns(session_id, dataset_id)
+
+
+
 with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
     gr.Markdown(
@@ -186,6 +216,15 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         file_types=[".csv"],
         type="filepath"
     )
+
+    # One id per visitor: new_session_id is passed WITHOUT parentheses,
+    # so Gradio calls it every time a page is opened
+    current_session = gr.State(dataset_store.new_session_id)
+
+    # The dataset_id of the CSV loaded in this session
+    current_dataset = gr.State(None)
+
+    dataset_status = gr.Markdown()
 
     analyze_button = gr.Button(
         "🔎 Analyze Dataset",
@@ -214,20 +253,20 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
     plot = gr.Plot()
 
     file.change(
-        fn=get_columns,
-        inputs=file,
-        outputs=column_dropdown
+        fn=on_csv_upload,
+        inputs=[current_session, file],
+        outputs=[current_dataset, dataset_status, column_dropdown]
     )
 
     analyze_button.click(
         fn=analyze_dataset,
-        inputs=file,
+        inputs=[current_session, current_dataset],
         outputs=[overview, statistics, preview]
     )
 
     generate_button.click(
         fn=create_histogram,
-        inputs=[file, column_dropdown],
+        inputs=[current_session, current_dataset, column_dropdown],
         outputs=plot
     )
     
@@ -265,7 +304,7 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
     ask_button.click(
     fn=ask_dataset,
-    inputs=[file, question],
+    inputs=[current_session, current_dataset, question],
     outputs=[answer, results_table]
 )
 
