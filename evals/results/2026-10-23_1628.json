@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-23T16:28:26",
+  "model": "gemma4:e4b",
+  "commit": "436ffce3",
+  "repeats": 3,
+  "passed": 3,
+  "runs_total": 3,
+  "runs": [
+    {
+      "id": "value_lookup",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "number": true
+      },
+      "seconds": 34.6,
+      "answer": "The second value in the `variance` column is **4.5459**.",
+      "tools": [
+        "select_rows"
+      ]
+    },
+    {
+      "id": "value_lookup",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "number": true
+      },
+      "seconds": 19.2,
+      "answer": "The second value of the variance column is 4.5459.",
+      "tools": [
+        "select_rows"
+      ]
+    },
+    {
+      "id": "value_lookup",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "number": true
+      },
+      "seconds": 24.0,
+      "answer": "The second value of the 'variance' column is 4.5459.",
+      "tools": [
+        "select_rows"
+      ]
+    }
+  ]
+}
