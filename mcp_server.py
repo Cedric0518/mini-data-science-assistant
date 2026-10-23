@@ -34,6 +34,26 @@ def fail(error):
     }
 
 
+PREVIEW_ROWS = 10
+
+
+def rows_preview(df):
+    """
+    The values of a small result, as text the model can read.
+    Returns an empty string when the result is too large to show.
+    """
+
+    if len(df) > PREVIEW_ROWS:
+        return ""
+
+    shown = df.reset_index(drop=True)
+    shown.index = shown.index + 1
+
+    return (
+        "\nValues, in file order (row 1 is the first row of this result):\n"
+        + shown.to_string()
+    )
+
 
 # --------------------------------------------------
 # Dataset registry
@@ -467,7 +487,8 @@ def filter_data(
         return ok(
             f"{len(rows)} rows matched {column} {operator} {value}. "
             f"To compute a statistic on these rows, "
-            f"call another tool with source=\"{handle}\".",
+            f"call another tool with source=\"{handle}\"."
+            + rows_preview(selected),
             handle=handle,
             rows=rows,
             columns=list(filtered.columns),
@@ -476,7 +497,7 @@ def filter_data(
 
     except Exception as e:
 
-        return fail(str(e))
+        return fail(str(e)) 
 
 @mcp.tool()
 def select_rows(source: str, count: int, position: str = "first") -> dict:
@@ -512,12 +533,14 @@ def select_rows(source: str, count: int, position: str = "first") -> dict:
         return ok(
             f"Kept the {position} {len(selected)} rows. "
             f"To compute a statistic on these rows, "
-            f"call another tool with source=\"{handle}\".",
+            f"call another tool with source=\"{handle}\"."
+            + rows_preview(selected),
             handle=handle,
             rows=selected.to_dict(orient="records"),
             columns=list(selected.columns),
             count=len(selected),
         )
+        
 
     except Exception as e:
         return fail(str(e))

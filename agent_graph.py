@@ -44,6 +44,7 @@ Rules:
   call calculate_statistic with source set to the returned handle.
 - Never compute averages or sums yourself. Always use a tool.
 - Earlier messages are the conversation so far. Use them to understand references like "this mean" or "that column", but call the tools again whenever you need data.
+- Never state a value from the dataset that does not appear in a tool result. If you cannot see it, call a tool or say that you cannot see it.
 """
 
 def summarize_tool_result(tool_name, raw_text):
