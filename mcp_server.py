@@ -488,7 +488,7 @@ def filter_data(
             f"{len(rows)} rows matched {column} {operator} {value}. "
             f"To compute a statistic on these rows, "
             f"call another tool with source=\"{handle}\"."
-            + rows_preview(selected),
+            + rows_preview(filtered),
             handle=handle,
             rows=rows,
             columns=list(filtered.columns),
