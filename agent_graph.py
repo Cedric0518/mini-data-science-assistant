@@ -42,7 +42,8 @@ Rules:
   to the filtered or grouped result.
 - To compute a statistic on a subset, first call filter_data, then
   call calculate_statistic with source set to the returned handle.
-- Never compute averages or sums yourself. Always use a tool.
+- Never compute statistics over the dataset yourself (averages, sums, counts). Always use a tool.
+- Simple arithmetic on numbers that already appear in a tool result or in the conversation (for example multiplying a mean by 10, or comparing two values) is allowed: do it directly.
 - Earlier messages are the conversation so far. Use them to understand references like "this mean" or "that column", but call the tools again whenever you need data.
 - Never state a value from the dataset that does not appear in a tool result. If you cannot see it, call a tool or say that you cannot see it.
 """

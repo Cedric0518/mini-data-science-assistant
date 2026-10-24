@@ -123,10 +123,10 @@ CASES = [
     # 5. Robustness
     # --------------------------------------------------
     {
-        "id": "unknown_column",
+         "id": "context_and_number",
         "file": UBER,
-        "turns": ["What is the average value of the Revenue column?"],
-        "must_contain_any": ["not found", "does not exist", "doesn't exist", "no column",
-                             "not available", "does not contain", "doesn't have", "not a column"],
+        "turns": ["What does Adj Close mean, and what was its average value in 2024?"],
+        "expected_number": lambda df: df.loc[dates(df).dt.year == 2024, "Adj Close"].mean(),
+        "expected_tools": ["search_context", "calculate_statistic"],
     },
 ]
