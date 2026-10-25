@@ -211,7 +211,7 @@ def build_graph(session, tools, file):
 
     builder.add_edge(START, "agent")
     builder.add_conditional_edges("agent", route_after_agent, ["tools", END])
-    builder.add_edge("tools", "agent")
+    builder.add_conditional_edges("tools", route_after_tools, ["agent", END])
 
     return builder.compile()
 
