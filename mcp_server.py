@@ -558,7 +558,8 @@ def group_by(
     Group a CSV dataset and calculate an aggregation.
 
     Args:
-        file_path: Path to the CSV file.
+        source: CSV file path, or a handle (ds:xxxxxx) from a
+            previous tool call.
         group_column: Column used for grouping.
         aggregation_column: Numerical column to aggregate.
         aggregation: One of mean, median, sum, min, or max.
@@ -668,10 +669,16 @@ def group_by(
 
         rows = grouped.to_dict(orient="records")
 
+        handle = store(grouped)
+
         return ok(
             f"{len(rows)} groups, "
             f"{aggregation} of '{aggregation_column}' "
-            f"by '{group_column}'.",
+            f"by '{group_column}'. "
+            f"To analyse these groups further, "
+            f"call another tool with source=\"{handle}\"."
+            + rows_preview(grouped),
+            handle=handle,
             rows=rows,
             columns=list(grouped.columns),
             count=len(rows),
