@@ -131,9 +131,7 @@ def ask_dataset(session_id, dataset_id, question, history):
     history = history or []
     hide_table = gr.update(value=None, visible=False)
 
-    # --------------------------------------------------
-    # 1. Validate inputs
-    # --------------------------------------------------
+  
 
     if not dataset_id:
         warning = {"role": "assistant", "content": "Please upload a CSV file."}
@@ -350,12 +348,7 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
 
     plot = gr.Plot()
 
-    file.change(
-        fn=on_csv_upload,
-        inputs=[current_session, file],
-        outputs=[current_dataset, dataset_status, column_dropdown]
-    )
-
+    
     analyze_button.click(
         fn=analyze_dataset,
         inputs=[current_session, current_dataset],
@@ -422,21 +415,7 @@ with gr.Blocks(title="Mini Data Science Assistant") as demo:
         outputs=results_table
     )
     
-    results_table = gr.Dataframe(
-    label="Query Results",
-    interactive=False
-)
-
-    question.submit(
-        fn=ask_dataset,
-        inputs=[current_session, current_dataset, question, chatbot],
-        outputs=[chatbot, question, results_table]
-    )
-
-    chatbot.clear(
-        fn=hide_results_table,
-        outputs=results_table
-    )
+   
     
     
 
