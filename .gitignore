@@ -6,5 +6,6 @@ __pycache__/
 *.rag/
 test_renamed.csv
 sessions/
+.env
 
 uber_stock_data.csv
