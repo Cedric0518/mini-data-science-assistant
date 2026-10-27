@@ -7,3 +7,5 @@ torch
 mcp==1.29.1
 numpy
 langgraph
+openai
+python-dotenv
