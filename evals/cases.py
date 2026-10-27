@@ -15,6 +15,12 @@ UBER = "uber_stock_data.csv"
 def dates(df):
     return pd.to_datetime(df["Date"])
 
+def iqr_outliers(series):
+    """Outliers by the 1.5 x IQR rule, computed independently of the tool."""
+    q1, q3 = series.quantile(0.25), series.quantile(0.75)
+    iqr = q3 - q1
+    return int(((series < q1 - 1.5 * iqr) | (series > q3 + 1.5 * iqr)).sum())
+
 
 CASES = [
 
@@ -129,4 +135,38 @@ CASES = [
         "expected_number": lambda df: df.loc[dates(df).dt.year == 2024, "Adj Close"].mean(),
         "expected_tools": ["search_context", "calculate_statistic"],
     },
+
+
+    # --------------------------------------------------
+    # 6. Tools not covered above
+    # --------------------------------------------------
+    {
+        "id": "group_by_best_year",
+        "file": UBER,
+        "turns": ["Which year had the highest average opening price?"],
+        "expected_number": lambda df: df.groupby(dates(df).dt.year)["Open"].mean().max(),
+        "must_contain_any": ["2024"],
+        "expected_tools": ["group_by"],
+    },
+    {
+        "id": "outliers_count",
+        "file": UBER,
+        "turns": ["How many outliers are there in the Volume column?"],
+        "expected_number": lambda df: iqr_outliers(df["Volume"]),
+        "expected_tools": ["detect_outliers"],
+    },
+    {
+        "id": "correlation_pair",
+        "file": BANKNOTE,
+        "turns": ["What is the correlation between variance and skewness?"],
+        "expected_number": lambda df: df["variance"].corr(df["skewness"]),
+        "expected_tools": ["correlation_analysis"],
+    },
+    {
+        "id": "row_count",
+        "file": BANKNOTE,
+        "turns": ["How many rows does this dataset have?"],
+        "expected_number": lambda df: len(df),
+    },
+
 ]
