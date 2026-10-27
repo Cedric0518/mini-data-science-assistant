@@ -9,9 +9,11 @@ import pandas as pd
 from langgraph.graph import StateGraph, START, END
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from llm_backend import make_backend
 
-
-MODEL = "gemma4:e4b"
+# The model behind the agent, chosen by BACKEND in .env (local by default)
+backend = make_backend()
+MODEL = backend.name
 MAX_STEPS = 5
 
 
@@ -91,24 +93,18 @@ class AgentState(TypedDict):
 # 2. Le graphe, construit à l'intérieur d'une session MCP
 # --------------------------------------------------
 
-def build_graph(session, tools, file):
+def build_graph(session, tools, file, backend):
     """
-    session, tools et file restent constants pendant toute la question.
+    session, tools, file et backend  restent constants pendant toute la question.
     Les nœuds définis ici s'en souviennent (closure).
     """
 
     async def agent(state: AgentState) -> dict:
 
-        # Dernière étape : on retire les outils pour forcer une réponse texte
+                # Dernière étape : le modèle doit répondre en texte
         last_step = state["step"] == MAX_STEPS - 1
 
-        response = ollama.chat(
-            model=MODEL,
-            messages=state["messages"],
-            tools=None if last_step else tools,
-        )
-
-        message = response["message"]
+        message = backend.chat(state["messages"], tools, use_tools=not last_step)
         step = state["step"] + 1
 
         # On renvoie seulement ce qui change
@@ -117,8 +113,8 @@ def build_graph(session, tools, file):
             "step": step,
         }
 
-        # Pas d'appel d'outil : Gemma a répondu, c'est la réponse finale
-        if not message.get("tool_calls"):
+        # Pas d'appel d'outil : le modèle a répondu, c'est la réponse finale
+        if not backend.tool_calls(message):
             update["final_answer"] = message.get("content") or "No answer produced."
 
         # Gemma veut encore un outil alors que le budget est épuisé
@@ -132,64 +128,81 @@ def build_graph(session, tools, file):
 
     async def run_tools(state: AgentState) -> dict:
 
-        # L'appel d'outil demandé par Gemma est dans son dernier message
-        message = state["messages"][-1]
-        tool_call = message["tool_calls"][0]
+        # Tous les appels demandés dans le dernier message du modèle :
+        # un modèle au format OpenAI peut en envoyer plusieurs à la fois
+        calls = backend.tool_calls(state["messages"][-1])
 
-        tool_name = tool_call["function"]["name"]
-        tool_arguments = dict(tool_call["function"]["arguments"])
+        messages = []
+        steps = []
+        table = None
+        final_answer = None
+        signature = state["last_error_signature"]
+        consecutive = state["consecutive_errors"]
 
-        # Pointer l'outil vers le fichier uploadé, sauf si Gemma
-        # réutilise un handle d'une étape précédente
-        tool_arguments.pop("file_path", None)
+        for call in calls:
 
-        if not str(tool_arguments.get("source", "")).startswith("ds:"):
-            tool_arguments["source"] = file
+            tool_name = call["name"]
+            tool_arguments = dict(call["arguments"])
 
-        # La MÊME session pour tous les appels : les handles ds:xxxx restent valides
-        try:
-            result = await session.call_tool(tool_name, arguments=tool_arguments)
-            raw_text = result.content[0].text
+            # Pointer l'outil vers le fichier uploadé, sauf si le modèle
+            # réutilise un handle d'une étape précédente
+            tool_arguments.pop("file_path", None)
 
-        except Exception as tool_error:
-            raw_text = f"Tool execution failed: {tool_error}"
+            if not str(tool_arguments.get("source", "")).startswith("ds:"):
+                tool_arguments["source"] = file
 
-        summary, table = summarize_tool_result(tool_name, raw_text)
+            # La MÊME session pour tous les appels : les handles ds:xxxx restent valides
+            try:
+                result = await session.call_tool(tool_name, arguments=tool_arguments)
+                raw_text = result.content[0].text
+
+            except Exception as tool_error:
+                raw_text = f"Tool execution failed: {tool_error}"
+
+            summary, call_table = summarize_tool_result(tool_name, raw_text)
+
+            # Une réponse par appel, même en cas d'erreur
+            messages.append(backend.tool_result(call, summary))
+            steps.append(f"{tool_name} → {summary[:200]}")
+
+            if call_table is not None:
+                table = call_table
+
+            # Arrêt si le même appel échoue deux fois de suite
+            if summary.startswith("Error"):
+
+                this_signature = f"{tool_name}:{tool_arguments}"
+
+                if this_signature == signature:
+                    consecutive += 1
+                else:
+                    consecutive = 1
+
+                signature = this_signature
+
+                if consecutive >= 2:
+                    final_answer = f"The analysis could not be completed: {summary}"
+
+            else:
+                signature = None
+                consecutive = 0
 
         update = {
-            "messages": [
-                {"role": "tool", "tool_name": tool_name, "content": summary}
-            ],
-            "steps": [f"{tool_name} → {summary[:200]}"],
+            "messages": messages,
+            "steps": steps,
+            "last_error_signature": signature,
+            "consecutive_errors": consecutive,
         }
 
         if table is not None:
             update["table_data"] = table
 
-                # Arrêt si le même appel échoue deux fois de suite
-        if summary.startswith("Error"):
-
-            signature = f"{tool_name}:{tool_arguments}"
-
-            if signature == state["last_error_signature"]:
-                consecutive = state["consecutive_errors"] + 1
-            else:
-                consecutive = 1
-
-            update["last_error_signature"] = signature
-            update["consecutive_errors"] = consecutive
-
-            if consecutive >= 2:
-                update["final_answer"] = (
-                    f"The analysis could not be completed: {summary}"
-                )
-
-        else:
-            update["last_error_signature"] = None
-            update["consecutive_errors"] = 0
+        if final_answer is not None:
+            update["final_answer"] = final_answer
 
         return update
 
+    # Les fonctions de routage LISENT l'état, elles n'écrivent jamais
         # Les fonctions de routage LISENT l'état, elles n'écrivent jamais
 
     def route_after_agent(state: AgentState) -> str:
@@ -253,7 +266,7 @@ async def run_agent(file, question, columns, numeric_columns, history=None):
 
             # Le graphe est construit DANS la session : tous les nœuds
             # partagent la même session, donc le même registre de handles
-            graph = build_graph(session, tools, file)
+            graph = build_graph(session, tools, file, backend) 
 
             initial_state = {
                 "messages": [
