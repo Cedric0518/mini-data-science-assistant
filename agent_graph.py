@@ -34,8 +34,11 @@ Rules:
   the dataset, use search_context with the user's question as query.
 - If a question needs both a definition and a number, use search_context
   and the data tools.
-- Do not explain what a column means from your own knowledge when
-  search_context can answer it.
+- The data shows which values a column takes, never what they mean.
+  For the meaning of a column, a value or a term, rely only on the
+  search_context passages. If they do not cover it, say that the dataset
+  description does not specify it. Do not guess the meaning from the
+  values, their counts or common conventions.
 - Always use an exact column name from the available columns.
 - "average" means statistic = "mean".
 - Do not invent column names.
