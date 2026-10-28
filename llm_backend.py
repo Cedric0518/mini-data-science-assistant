@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+BLOCKED_ANSWER = "This request was blocked by the safety guardrail of the model deployment."
 
 class OllamaBackend:
     """Gemma on this machine, through Ollama."""
@@ -67,15 +68,31 @@ class FoundryBackend:
         self.name = f"foundry/{self.model}"
 
     def chat(self, messages, tools, use_tools=True):
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            tools=tools,
-            # Last step: the tools stay declared, but the model must answer in text
-            tool_choice="auto" if use_tools else "none",
-        )
+        from openai import BadRequestError
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                tools=tools,
+                # Last step: the tools stay declared, but the model must answer in text
+                tool_choice="auto" if use_tools else "none",
+            )
+
+        except BadRequestError as error:
+            # The deployment's guardrail refused the prompt: answer instead of crashing
+            if error.code != "content_filter":
+                raise
+            return {"role": "assistant", "content": BLOCKED_ANSWER}
+
+        choice = response.choices[0]
+
+        # The guardrail can also cut the model's own answer
+        if choice.finish_reason == "content_filter":
+            return {"role": "assistant", "content": BLOCKED_ANSWER}
+
         # A plain dict, like every other message of the conversation
-        return response.choices[0].message.model_dump(exclude_none=True)
+        return choice.message.model_dump(exclude_none=True)
 
     def tool_calls(self, message):
         # The arguments arrive as a JSON string, and every call has an id
