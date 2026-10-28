@@ -1,0 +1,140 @@
+{
+  "date": "2026-10-28T00:19:28",
+  "model": "foundry/gpt-4.1-mini",
+  "commit": "3b31cebc",
+  "repeats": 10,
+  "passed": 10,
+  "runs_total": 10,
+  "runs": [
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 2.7,
+      "answer": "The dataset does not have a description document available that explains the meaning of the \"entropy\" column. Therefore, I cannot provide a specific meaning for the entropy column from the dataset's documentation.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 2.5,
+      "answer": "There is no description available for the meaning of the \"entropy\" column in this dataset. If you would like, I can help analyze the data values or other aspects of the dataset.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 1.9,
+      "answer": "No description is available for the meaning of the \"entropy\" column in this dataset.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 2.1,
+      "answer": "The dataset does not have a description document available, so the meaning of the \"entropy\" column is not specified in the provided context.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 1.9,
+      "answer": "There is no description available for the meaning of the \"entropy\" column in this dataset. If you have any other questions or need numerical data analysis, feel free to ask!",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 1.8,
+      "answer": "No description is available for the meaning of the entropy column in this dataset.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 1.8,
+      "answer": "There is no description available for the meaning of the entropy column in this dataset.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 1.9,
+      "answer": "No description is available for the meaning of the entropy column in this dataset. The dataset does not provide a definition or explanation for the entropy column.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 2.3,
+      "answer": "The dataset does not have a description document, so there is no available definition or explanation for the meaning of the \"entropy\" column. If you need, I can assist with analyzing its values or statistics.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_missing",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "wording": true
+      },
+      "seconds": 2.0,
+      "answer": "There is no description available for the meaning of the \"entropy\" column in this dataset. It is a numerical column, but the dataset does not specify what it represents.",
+      "tools": [
+        "search_context"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,710 @@
+{
+  "date": "2026-10-28T00:22:03",
+  "model": "foundry/gpt-4.1-mini",
+  "commit": "3b31cebc",
+  "repeats": 50,
+  "passed": 50,
+  "runs_total": 50,
+  "runs": [
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.1,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer, but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.5,
+      "answer": "The description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer but does not indicate the meaning of the values in relation to genuine or forged banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.3,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer representing the class, but does not define the meaning of the specific values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.4,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of the values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.0,
+      "answer": "The description does not specify which value of the \"class\" column means a forged banknote. It provides the column name and type but does not define the class values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.0,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer but does not explain the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.3,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of the specific values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 1.9,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.5,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of the values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.1,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that class is an integer.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.2,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer representing the classification, but does not define the values for genuine or forged banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.4,
+      "answer": "The dataset description does not specify which value of the \"class\" column means a forged banknote. It only describes that the class column is an integer but does not state what the values represent in terms of genuine or forged banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.1,
+      "answer": "The description of the dataset does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not clarify which integer corresponds to forged or genuine banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.4,
+      "answer": "The description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.4,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.2,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not explain the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.2,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer but does not define the meaning of each class value.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.2,
+      "answer": "The dataset description does not specify the exact meaning of the values in the \"class\" column, including which value indicates a forged banknote.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.1,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.1,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that images are from genuine and forged banknotes, and the class column is an integer, but does not define the values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.3,
+      "answer": "The dataset description does not specify the meaning of the values in the class column or which value means a forged banknote.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.3,
+      "answer": "The description does not specify which value of the class column means a forged banknote. It only mentions that the data includes genuine and forged banknote-like specimens and that the class column is an integer, but it does not define the specific meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.2,
+      "answer": "The description does not specify which value of the \"class\" column means a forged banknote. It only mentions that the class column is an integer but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.1,
+      "answer": "The dataset description does not specify which value of the \"class\" column means a forged banknote. It only mentions that the \"class\" column is an integer but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.2,
+      "answer": "The dataset description does not specify which value of the class column corresponds to a forged banknote. It only mentions that the class column is an integer but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 2.3,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the specific values for forged or genuine banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.1,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer representing the class, without detailing the meaning of each integer value.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.0,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer, but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.8,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of its specific values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.2,
+      "answer": "The dataset description does not specify which value of the class column indicates a forged banknote. It only states that the class column is an integer but does not define the meaning of each class value.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.8,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not explain what each value represents.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.9,
+      "answer": "The description of the dataset does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.1,
+      "answer": "The description does not specify which value of the \"class\" column means a forged banknote. It only mentions that the \"class\" is an integer but does not define the meaning of the specific values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.1,
+      "answer": "The description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not clarify the meaning of the values in relation to forged or genuine banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.9,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only indicates that the class column is an integer but does not define what each integer value represents.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.1,
+      "answer": "The dataset description does not specify which value of the \"class\" column means a forged banknote. It only states that the class column is an integer and the data were extracted from genuine and forged banknotes, but it does not clarify the specific meaning of the class values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.0,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.3,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of its values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.7,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define its values or their meanings.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.8,
+      "answer": "The dataset description does not specify which value of the \"class\" column corresponds to a forged banknote. It only states that the \"class\" column is an integer but does not provide the meaning of each value.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.9,
+      "answer": "The dataset description does not specify which value of the \"class\" column means a forged banknote.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.0,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define what each integer value represents.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.1,
+      "answer": "The description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of its values with respect to genuine or forged banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.9,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class column is an integer representing the class, but does not clarify the meaning of the specific values.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.1,
+      "answer": "The description of the dataset does not specify which value of the class column means a forged banknote. It only states that the class column is of type integer.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.0,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only indicates that the class column is an integer, but does not explicitly state the meaning of its values, including which value corresponds to a forged banknote.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 3.8,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only mentions that the class is an integer, but does not clarify what each class value represents.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.0,
+      "answer": "The description does not specify which value of the class column means a forged banknote. It only indicates that the class column is an integer representing classes, but does not clarify which integer corresponds to forged banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.1,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer but does not define the meaning of its values in terms of genuine or forged banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 4.0,
+      "answer": "The dataset description does not specify which value of the class column means a forged banknote. It only states that the class column is an integer representing the class but does not clarify the class labels for genuine or forged banknotes.",
+      "tools": [
+        "search_context"
+      ]
+    }
+  ]
+}
