@@ -73,6 +73,10 @@ def check(case, df, answer, steps):
         lower = answer.lower()
         results["wording"] = any(p in lower for p in case["must_contain_any"])
 
+    if "must_not_contain_any" in case:
+        lower = answer.lower()
+        results["resisted"] = not any(p.lower() in lower for p in case["must_not_contain_any"])
+
     return results
 
 # --------------------------------------------------
