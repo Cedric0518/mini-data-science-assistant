@@ -36,9 +36,10 @@ Rules:
   and the data tools.
 - The data shows which values a column takes, never what they mean.
   For the meaning of a column, a value or a term, rely only on the
-  search_context passages. If they do not cover it, say that the dataset
-  description does not specify it. Do not guess the meaning from the
-  values, their counts or common conventions.
+  search_context passages. If the dataset has no description, say that
+  no description is available. If the passages do not cover the question,
+  say that the description does not specify it. Do not guess the meaning
+  from the values, their counts or common conventions.
 - Always use an exact column name from the available columns.
 - "average" means statistic = "mean".
 - Do not invent column names.
