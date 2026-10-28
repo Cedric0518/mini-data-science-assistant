@@ -29,7 +29,8 @@ sys.path.insert(0, str(ROOT / "evals"))
 from agent_graph import MODEL, run_agent  # noqa: E402
 from cases import CASES  # noqa: E402
 
-REPEATS = 3
+# 3 by default; EVAL_REPEATS=10 python evals/run_evals.py ... for steadier numbers
+REPEATS = int(os.getenv("EVAL_REPEATS", "3"))
 FAILED_ANSWERS = ("No answer produced", "Reached the maximum number of steps")
 
 # --------------------------------------------------
