@@ -1,0 +1,174 @@
+{
+  "date": "2026-10-29T09:29:51",
+  "model": "foundry/gpt-5-mini",
+  "commit": "a6301bee",
+  "repeats": 10,
+  "passed": 2,
+  "runs_total": 10,
+  "runs": [
+    {
+      "id": "context_not_covered",
+      "passed": false,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": false
+      },
+      "seconds": 24.2,
+      "answer": "class = 1 indicates a forged banknote (class = 0 is genuine).",
+      "tools": [
+        "search_context",
+        "group_by",
+        "search_context",
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 9.1,
+      "answer": "I can't tell from the dataset description — the documentation returned only lists \"class (integer)\" and does not say which integer corresponds to a forged banknote.\n\nI can (a) look up the original dataset source for the mapping, or (b) inspect the file to show the distinct values present in the class column (e.g., 0 and 1) so you can confirm which labels appear. Which would you prefer?",
+      "tools": [
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": false,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": false
+      },
+      "seconds": 20.7,
+      "answer": "A value of 1 in the class column indicates a forged banknote (0 = genuine, 1 = forged).",
+      "tools": [
+        "search_context",
+        "get_dataset_info",
+        "search_context",
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": false,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": false
+      },
+      "seconds": 17.1,
+      "answer": "In the standard Banknote Authentication dataset, class = 1 indicates a forged banknote and class = 0 indicates a genuine banknote. I can verify this directly from the file if you’d like — would you like me to check and confirm?",
+      "tools": [
+        "search_context",
+        "select_rows",
+        "search_context",
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": false,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": false
+      },
+      "seconds": 23.7,
+      "answer": "In this dataset the class value 1 indicates a forged banknote (class 0 indicates genuine). Would you like me to show a few example rows to confirm?",
+      "tools": [
+        "search_context",
+        "search_context",
+        "search_context",
+        "calculate_statistic"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": true,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": true
+      },
+      "seconds": 16.3,
+      "answer": "I looked for the meaning of the class values in the dataset documentation that comes with the file, but the provided description only lists \"class (integer)\" and does not say which integer means forged versus genuine. I can't determine the mapping from the included documentation.\n\nHow would you like to proceed?\n- I can show sample rows or the distinct values in the class column from the CSV.\n- I can try to look up the canonical mapping from an external source (e.g., the UCI repository).\n- Or I can proceed using the common convention (many sources use class = 1 for forged and class = 0 for genuine), but I would mark that as an assumption.",
+      "tools": [
+        "search_context",
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": false,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": false
+      },
+      "seconds": 19.3,
+      "answer": "I don't currently have access to the dataset documentation to verify, but from the standard Banknote Authentication dataset: class = 1 means a forged banknote (class = 0 is genuine). If you want, I can double-check this against the file.",
+      "tools": [
+        "search_context",
+        "search_context",
+        "search_context",
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": false,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": false
+      },
+      "seconds": 20.3,
+      "answer": "In this dataset, class = 1 indicates a forged banknote (class = 0 indicates genuine).",
+      "tools": [
+        "search_context",
+        "search_context",
+        "get_dataset_info",
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": false,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": false
+      },
+      "seconds": 17.3,
+      "answer": "In this dataset, class = 1 indicates a forged banknote (class = 0 indicates genuine).",
+      "tools": [
+        "search_context",
+        "search_context",
+        "get_dataset_info",
+        "search_context"
+      ]
+    },
+    {
+      "id": "context_not_covered",
+      "passed": false,
+      "checks": {
+        "answered": true,
+        "tools": true,
+        "wording": false
+      },
+      "seconds": 14.3,
+      "answer": "I checked the dataset's description (Attribute Information) and it lists the column \"class (integer)\" but does not state which integer value corresponds to forged vs genuine. The description does not answer which value means a forged banknote.\n\nWould you like me to:\n- Look up the mapping from the original source (e.g., the UCI repository) to confirm which value means forged? or\n- Show the class-value distribution in this CSV so you can inspect how many 0s vs 1s appear?",
+      "tools": [
+        "search_context",
+        "search_context",
+        "search_context"
+      ]
+    }
+  ]
+}
