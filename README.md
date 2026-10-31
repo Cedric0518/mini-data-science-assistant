@@ -14,12 +14,18 @@ short_description: Lightweight Gradio app to explore and understand CSV dataset
 
 # Mini Data Science Assistant
 
+> **This project continues as [Oyeva Sales](https://github.com/Cedric0518/oyeva-sales).**
+> This repository is version 1, frozen at the tag `v1-local-mcp`. Oyeva Sales keeps what
+> this version taught (numbers come from code, meaning comes from the user's own document,
+> every change is measured) and rebuilds it as a production agent on Microsoft Foundry.
+
 An agentic data science assistant. Upload a CSV, optionally with a
 document describing it, then have a conversation about it in plain language.
 A local LLM decides which tools to run, chains them together, and explains
 the result. Follow-up questions like "and multiplied by 2?" work.
 
-Everything runs locally. No API keys, no cloud inference. Each visitor gets
+By default, everything runs locally: no API keys, no cloud inference. An optional
+backend (`BACKEND=foundry`) runs the same agent on Microsoft Foundry. Each visitor gets
 an isolated session: uploads, descriptions and conversations are never shared.
 
 ## What it does
@@ -338,10 +344,12 @@ python test_agent_graph.py
 ```
 app.py               Gradio interface
 agent_graph.py       LangGraph agent: state, nodes, routing, entry point
+llm_backend.py       Model adapter: local (Ollama) or Microsoft Foundry
 mcp_server.py        MCP server, tools, dataset registry
 rag.py               Chunking, embeddings, index and search over descriptions
 dataset_store.py     Session-scoped, content-addressed dataset storage
 docs/DECISIONS.md    Design decisions and their trade-offs
+evals/               Evaluation cases, runner, judge interview and reports
 mcp_client.py        Async wrappers for direct tool calls
 uber_stock_data.md   Example description document
 test_mcp.py          Tool tests without the LLM
@@ -363,9 +371,12 @@ llm_mcp_test.py      LLM + MCP integration test
 - [x] Session-scoped dataset store, no user accounts
 - [x] Description upload in the web interface
 - [x] Chat interface with follow-up questions
-- [ ] Evaluation suite for the agent: answer accuracy, failure rates
-- [ ] Read-only SQL tool (DuckDB) as a safer alternative to generated code
-- [ ] Deployment on a self-hosted VPS, with session cleanup
+- [x] Evaluation suite for the agent: answer accuracy, failure rates (`evals/`)
+- [x] Optional Microsoft Foundry backend, with a content safety guardrail
+- [x] LLM judge tested against human-labelled answers before being trusted
+
+Deployment, document search on Azure and certified metrics continue in
+[Oyeva Sales](https://github.com/Cedric0518/oyeva-sales).
 
 ## License
 
